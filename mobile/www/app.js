@@ -180,7 +180,7 @@ async function attemptLogin(isAuto = false) {
       // Companion gateway mode
       const targetGateway = host.startsWith("http") ? host : `http://${host}`;
       activeConfig.gateway = targetGateway;
-      const statusRes = await fetch(`${targetGateway}/api/status`);
+      const statusRes = await httpRequest({ url: `${targetGateway}/api/status` });
       const statusData = await statusRes.json();
       if (statusData.status !== "connected") {
         throw new Error(statusData.error || "Gateway reported iLO connection failure");
@@ -273,21 +273,64 @@ function updateHeaderLabels(model, latencyText) {
 }
 
 /* ---------------- HTTP TRANSPORT ENGINE ---------------- */
+async function httpRequest({ url, method = "GET", headers = {}, data = null }) {
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorHttp) {
+    try {
+      const options = {
+        url,
+        method,
+        headers,
+        data: data ? (typeof data === "string" ? JSON.parse(data) : data) : undefined
+      };
+      const res = await window.Capacitor.Plugins.CapacitorHttp.request(options);
+      return {
+        ok: res.status >= 200 && res.status < 300,
+        status: res.status,
+        headers: {
+          get: (key) => {
+            if (!res.headers) return null;
+            const lKey = key.toLowerCase();
+            for (const [k, v] of Object.entries(res.headers)) {
+              if (k.toLowerCase() === lKey) return v;
+            }
+            return null;
+          }
+        },
+        json: async () => (typeof res.data === "string" ? JSON.parse(res.data) : res.data),
+        text: async () => (typeof res.data === "string" ? res.data : JSON.stringify(res.data))
+      };
+    } catch (e) {
+      console.warn("CapacitorHttp request error:", e);
+      throw e;
+    }
+  }
+
+  // Standard fetch fallback (browser or dev mode)
+  const fetchOpts = {
+    method,
+    headers,
+    body: data ? (typeof data === "string" ? data : JSON.stringify(data)) : undefined
+  };
+  return await fetch(url, fetchOpts);
+}
+
 async function iloRequest(endpoint, method = "GET", body = null) {
   if (activeConfig.mode === "gateway") {
     const base = activeConfig.gateway || `http://${activeConfig.host}`;
     if (endpoint.startsWith("/api/")) {
-      const res = await fetch(`${base}${endpoint}`, {
+      const res = await httpRequest({
+        url: `${base}${endpoint}`,
         method,
         headers: { "Content-Type": "application/json" },
-        body: body ? JSON.stringify(body) : undefined
+        data: body
       });
       return await res.json();
     } else {
-      const res = await fetch(`${base}/api/rest/proxy`, {
+      const res = await httpRequest({
+        url: `${base}/api/rest/proxy`,
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ method, path: endpoint, body })
+        data: { method, path: endpoint, body }
       });
       const data = await res.json();
       if (data.status === "error") throw new Error(data.error);
@@ -299,14 +342,15 @@ async function iloRequest(endpoint, method = "GET", body = null) {
     if (!activeConfig.token) {
       await directLogin();
     }
-    const res = await fetch(`${base}${endpoint}`, {
+    const res = await httpRequest({
+      url: `${base}${endpoint}`,
       method,
       headers: {
         "X-Auth-Token": activeConfig.token,
         "Content-Type": "application/json",
         "Accept": "application/json"
       },
-      body: body ? JSON.stringify(body) : undefined
+      data: body
     });
 
     if (res.status === 401) {
@@ -319,10 +363,11 @@ async function iloRequest(endpoint, method = "GET", body = null) {
 
 async function directLogin() {
   const url = `https://${activeConfig.host}/rest/v1/SessionService/Sessions`;
-  const res = await fetch(url, {
+  const res = await httpRequest({
+    url,
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ UserName: activeConfig.user, Password: activeConfig.password })
+    data: { UserName: activeConfig.user, Password: activeConfig.password }
   });
   if (!res.ok) {
     throw new Error(`Authentication failed (HTTP ${res.status}). Verify IP and credentials.`);

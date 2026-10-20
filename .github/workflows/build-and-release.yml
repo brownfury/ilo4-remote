@@ -34,6 +34,10 @@ jobs:
         working-directory: mobile
         run: npm ci
 
+      - name: Patch Capacitor SSL Trust
+        working-directory: mobile
+        run: node scripts/patch-ssl.js
+
       - name: Sync Capacitor Android
         working-directory: mobile
         run: npx cap sync android
@@ -66,6 +70,10 @@ jobs:
         working-directory: mobile
         run: npm ci
 
+      - name: Patch Capacitor SSL Trust
+        working-directory: mobile
+        run: node scripts/patch-ssl.js
+
       - name: Sync Capacitor iOS
         working-directory: mobile
         run: npx cap sync ios
@@ -73,6 +81,10 @@ jobs:
       - name: Install CocoaPods
         working-directory: mobile/ios/App
         run: pod install
+
+      - name: Verify SSL Patch Before Build
+        working-directory: mobile
+        run: node scripts/patch-ssl.js
 
       - name: Build iOS Archive
         working-directory: mobile/ios/App
