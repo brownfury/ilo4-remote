@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.venv/
+venv/
+ENV/
+
+# Node & Capacitor
+node_modules/
+mobile/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Android
+.gradle/
+build/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/local.properties
+*.apk
+*.aab
+
+# Keep releases folder tracked for the built APK
+!releases/
+!releases/*.apk
+
+# iOS
+*.mode1v3
+*.mode2v3
+*.moved-aside
+*.pbxuser
+*.perspectivev3
+**/*.xcuserstate
+mobile/ios/App/build/
+mobile/ios/App/Pods/
+mobile/ios/App/Podfile.lock
+
+# IDEs & System
+.DS_Store
+.idea/
+.vscode/
+*.swp

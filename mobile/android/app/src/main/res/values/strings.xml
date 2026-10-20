@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">iLO 4 Remote</string>
+    <string name="title_activity_main">iLO 4 Remote</string>
+    <string name="package_name">com.hpe.ilo4remote</string>
+    <string name="custom_url_scheme">com.hpe.ilo4remote</string>
+</resources>

@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HP iLO 4 Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Top Header Navigation -->
+  <header>
+    <div class="header-container">
+      <div class="brand-section">
+        <div class="brand-logo">HPE</div>
+        <div class="brand-info">
+          <h1>
+            iLO 4 Command Center
+            <span class="brand-badge">ProLiant ML350 Gen9</span>
+          </h1>
+          <div class="brand-subtitle">
+            <span class="status-dot" id="headerStatusDot"></span>
+            <span id="headerIloHost">{{ ilo_host }}</span>
+            <span style="color: var(--text-dim);">•</span>
+            <span id="headerLatency">Checking...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Home Network Access Pill -->
+        <div class="lan-banner-chip" id="lanPill" title="Click to copy Home LAN URL">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+          <span>LAN: <strong id="lanUrlText">{{ lan_ip }}:{{ lan_port }}</strong></span>
+        </div>
+
+        <!-- UID Beacon Button -->
+        <button class="btn-icon" id="btnToggleUid" title="Toggle Unit Identification (UID) Blue LED">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+          </svg>
+          <span id="uidText">UID LED</span>
+        </button>
+
+        <!-- Refresh Button -->
+        <button class="btn-icon" id="btnRefreshAll" title="Refresh Live Data">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/>
+          </svg>
+          <span>Refresh</span>
+        </button>
+
+        <!-- Settings Button -->
+        <button class="btn-icon" id="btnOpenSettings" title="iLO Connection Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tab Bar -->
+  <nav class="tabs-bar">
+    <div class="tabs-container">
+      <button class="tab-btn active" data-tab="tab-power">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+          <line x1="12" y1="2" x2="12" y2="12"></line>
+        </svg>
+        Power & Controls
+      </button>
+
+      <button class="tab-btn" data-tab="tab-hardware">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+          <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+          <line x1="6" y1="6" x2="6.01" y2="6"></line>
+          <line x1="6" y1="18" x2="6.01" y2="18"></line>
+        </svg>
+        Hardware Telemetry
+      </button>
+
+      <button class="tab-btn" data-tab="tab-sensors">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+        </svg>
+        Sea of Sensors & Fans
+      </button>
+
+      <button class="tab-btn" data-tab="tab-logs">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        Event Logs (IML/IEL)
+      </button>
+
+      <button class="tab-btn" data-tab="tab-rest">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+        REST API Explorer (121 Endpoints)
+      </button>
+
+      <button class="tab-btn" data-tab="tab-ribcl">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+          <rect x="9" y="9" width="6" height="6"></rect>
+          <line x1="9" y1="1" x2="9" y2="4"></line>
+          <line x1="15" y1="1" x2="15" y2="4"></line>
+          <line x1="9" y1="20" x2="9" y2="23"></line>
+          <line x1="15" y1="20" x2="15" y2="23"></line>
+        </svg>
+        RIBCL Command Center (160+ Methods)
+      </button>
+
+      <button class="tab-btn" data-tab="tab-network">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+        LAN & Home Network
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Body Content -->
+  <main>
+
+    <!-- TAB 1: POWER & CONTROLS -->
+    <div id="tab-power" class="tab-content active">
+      <div class="power-hero-grid">
+        <!-- Big Power Dial Card -->
+        <div class="glass-panel power-switch-panel">
+          <div class="power-dial-wrapper">
+            <div class="power-dial-ring" id="powerDialRing"></div>
+            <button class="power-btn-main" id="btnMainPowerToggle" title="Click to toggle power state">
+              <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                <line x1="12" y1="2" x2="12" y2="12"></line>
+              </svg>
+              <span id="btnMainPowerText" style="font-weight: 700; font-size: 1rem; letter-spacing: 0.5px;">POWER</span>
+            </button>
+          </div>
+
+          <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px;">CURRENT MACHINE STATE</div>
+          <div class="power-status-badge" id="powerStatusBadge">
+            <span class="status-dot" id="powerStatusDot"></span>
+            <span id="powerStatusLabel">CHECKING...</span>
+          </div>
+
+          <div style="margin-top: 20px; display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: var(--text-dim);">
+            <input type="checkbox" id="chkAutoPoll" checked style="cursor: pointer;">
+            <label for="chkAutoPoll" style="cursor: pointer;">Live status polling (4s)</label>
+          </div>
+        </div>
+
+        <!-- Power Action Command Center -->
+        <div class="glass-panel power-controls-panel">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              Power Management Actions
+            </h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+              Direct hardware-level power controls via HPE iLO 4 RESTful API & RIBCL.
+            </p>
+
+            <div class="action-buttons-grid">
+              <!-- Power On -->
+              <div class="action-card-btn" onclick="executePowerAction('on', 'Power On')">
+                <div class="action-icon green">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                </div>
+                <div class="action-info">
+                  <h4>Turn Server ON</h4>
+                  <p>Boots the HPE ProLiant ML350 machine from standby</p>
+                </div>
+              </div>
+
+              <!-- Graceful Shutdown -->
+              <div class="action-card-btn" onclick="executePowerAction('graceful_shutdown', 'Graceful Shutdown')">
+                <div class="action-icon amber">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                </div>
+                <div class="action-info">
+                  <h4>Graceful Shutdown</h4>
+                  <p>Sends ACPI power signal for clean OS shutdown</p>
+                </div>
+              </div>
+
+              <!-- Momentary Power Button -->
+              <div class="action-card-btn" onclick="executePowerAction('push_power_button', 'Momentary Button Press')">
+                <div class="action-icon blue">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="9"></circle>
+                    <path d="M12 7v5"></path>
+                  </svg>
+                </div>
+                <div class="action-info">
+                  <h4>Press Power Button</h4>
+                  <p>Simulates physical momentary power button press</p>
+                </div>
+              </div>
+
+              <!-- Force Power Off -->
+              <div class="action-card-btn" onclick="confirmPowerAction('force_off', 'Force Power Off', 'danger')">
+                <div class="action-icon red">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  </svg>
+                </div>
+                <div class="action-info">
+                  <h4>Force Power OFF</h4>
+                  <p>Hard instantaneous power cut (Immediate)</p>
+                </div>
+              </div>
+
+              <!-- Force Reboot / Reset -->
+              <div class="action-card-btn" onclick="confirmPowerAction('reset', 'System Reset / Reboot', 'warning')">
+                <div class="action-icon purple">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                </div>
+                <div class="action-info">
+                  <h4>Reboot / Reset</h4>
+                  <p>Hard hardware reboot cycle (Cold reset)</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Specs Strip -->
+          <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; color: var(--text-dim);">
+            <div><strong>Target:</strong> HPE ProLiant ML350 Gen9</div>
+            <div><strong>Processors:</strong> 2x Intel Xeon E5-2620 v3</div>
+            <div><strong>Memory:</strong> 112 GB RAM</div>
+            <div><strong>iLO 4:</strong> v2.81</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: HARDWARE TELEMETRY -->
+    <div id="tab-hardware" class="tab-content">
+      <div class="telemetry-grid">
+        <!-- Server Card -->
+        <div class="telemetry-card">
+          <div class="telemetry-header">
+            <span class="telemetry-title">Host Server</span>
+            <span class="brand-badge" id="hwHealthBadge">HEALTH OK</span>
+          </div>
+          <div class="telemetry-value" id="hwModel">ProLiant ML350 Gen9</div>
+          <div class="telemetry-sub">Serial: <span id="hwSerial">CZ254307FB</span> • BIOS: <span id="hwBios">P92 v2.92</span></div>
+        </div>
+
+        <!-- Processor Card -->
+        <div class="telemetry-card">
+          <div class="telemetry-header">
+            <span class="telemetry-title">Processors</span>
+            <span class="brand-badge">2x Sockets</span>
+          </div>
+          <div class="telemetry-value" id="hwCpuModel">Intel Xeon E5-2620 v3</div>
+          <div class="telemetry-sub" id="hwCpuSub">Dual Multi-core @ 2.40 GHz</div>
+        </div>
+
+        <!-- Memory Card -->
+        <div class="telemetry-card">
+          <div class="telemetry-header">
+            <span class="telemetry-title">System Memory</span>
+            <span class="brand-badge">DDR4 ECC</span>
+          </div>
+          <div class="telemetry-value" id="hwMemory">112 GiB</div>
+          <div class="telemetry-sub">Total Installed System RAM</div>
+        </div>
+
+        <!-- iLO 4 Manager Card -->
+        <div class="telemetry-card">
+          <div class="telemetry-header">
+            <span class="telemetry-title">iLO 4 Controller</span>
+            <span class="brand-badge">Dedicated ASIC</span>
+          </div>
+          <div class="telemetry-value" id="hwIloFirmware">v2.81</div>
+          <div class="telemetry-sub">Host: 192.168.8.53 • RESTful & RIBCL Enabled</div>
+        </div>
+      </div>
+
+      <!-- Power Supply Status -->
+      <div class="glass-panel" style="margin-top: 20px;">
+        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 14px;">Power Supplies & Redundancy</h3>
+        <div id="psuContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: SEA OF SENSORS & FANS -->
+    <div id="tab-sensors" class="tab-content">
+      <div class="glass-panel" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 700;">HPE Sea of Sensors™ (46 Thermal Zones)</h3>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">Real-time temperatures across motherboard, processors, memory, and chassis.</p>
+          </div>
+          <span class="brand-badge" id="sensorCountBadge">46 Sensors</span>
+        </div>
+        <div class="sensors-container" id="sensorGrid">
+          <!-- Dynamically loaded -->
+          <div style="padding: 20px; color: var(--text-muted);">Loading thermal sensors...</div>
+        </div>
+      </div>
+
+      <div class="glass-panel">
+        <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 6px;">Chassis Cooling Fans (8 Tachometers)</h3>
+        <p style="font-size: 0.82rem; color: var(--text-muted);">Current speed duty cycles across redundant cooling fans.</p>
+        <div class="fans-grid" id="fansGrid">
+          <!-- Dynamically loaded -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: EVENT LOGS -->
+    <div id="tab-logs" class="tab-content">
+      <div class="glass-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 700;">System Event Logs</h3>
+            <p style="font-size: 0.82rem; color: var(--text-muted);">Diagnostic telemetry from Integrated Management Log (IML) and iLO Event Log (IEL).</p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn-icon active" id="btnLogIML" onclick="switchLogView('iml')">IML Entries</button>
+            <button class="btn-icon" id="btnLogIEL" onclick="switchLogView('iel')">iLO Events (IEL)</button>
+          </div>
+        </div>
+
+        <div class="logs-table-wrapper">
+          <table class="logs-table">
+            <thead>
+              <tr>
+                <th style="width: 80px;">Severity</th>
+                <th style="width: 170px;">Timestamp</th>
+                <th style="width: 80px;">Record ID</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody id="logsTableBody">
+              <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading event logs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: REST API EXPLORER -->
+    <div id="tab-rest" class="tab-content">
+      <div class="explorer-layout">
+        <!-- Endpoints Directory Sidebar -->
+        <div class="endpoint-sidebar">
+          <input type="text" class="search-input" id="restSearch" placeholder="Search 121 REST endpoints...">
+          <div class="endpoint-list" id="restEndpointList">
+            <!-- Dynamically populated -->
+            <div style="padding: 10px; color: var(--text-muted);">Discovering endpoints...</div>
+          </div>
+        </div>
+
+        <!-- Request Composer & Response Area -->
+        <div class="request-composer">
+          <div class="url-bar-group">
+            <select class="select-method" id="restMethod">
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PATCH">PATCH</option>
+              <option value="PUT">PUT</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+            <input type="text" class="input-url" id="restPath" value="/rest/v1/Systems/1" placeholder="/rest/v1/...">
+            <button class="btn-primary" id="btnSendRest">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              Execute
+            </button>
+          </div>
+
+          <!-- Quick Templates -->
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 0.8rem; color: var(--text-muted);">
+            <span>Presets:</span>
+            <button class="btn-icon" style="padding: 3px 8px; font-size: 0.75rem;" onclick="setRestPreset('/rest/v1/Systems/1', 'GET')">Systems/1</button>
+            <button class="btn-icon" style="padding: 3px 8px; font-size: 0.75rem;" onclick="setRestPreset('/rest/v1/Chassis/1/Thermal', 'GET')">Thermal</button>
+            <button class="btn-icon" style="padding: 3px 8px; font-size: 0.75rem;" onclick="setRestPreset('/rest/v1/Chassis/1/Power', 'GET')">Power Supplies</button>
+            <button class="btn-icon" style="padding: 3px 8px; font-size: 0.75rem;" onclick="setRestPreset('/rest/v1/Managers/1', 'GET')">Manager Info</button>
+            <button class="btn-icon" style="padding: 3px 8px; font-size: 0.75rem;" onclick="setRestPreset('/rest/v1/AccountService/Accounts', 'GET')">Accounts</button>
+          </div>
+
+          <!-- Request Body (for POST/PATCH) -->
+          <div>
+            <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">JSON Request Payload (Optional):</div>
+            <textarea class="code-editor-area" id="restPayload" placeholder='{"Action": "Reset", "ResetType": "On"}'></textarea>
+          </div>
+
+          <!-- Response Viewer -->
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted);">
+                Response Output:
+                <span id="restStatusBadge" style="margin-left: 8px;"></span>
+                <span id="restElapsedBadge" style="margin-left: 8px; color: var(--text-dim); font-size: 0.75rem;"></span>
+              </div>
+              <button class="btn-icon" style="padding: 3px 10px; font-size: 0.75rem;" onclick="copyRestResponse()">Copy JSON</button>
+            </div>
+            <pre class="response-viewer" id="restResponse">Click 'Execute' to perform a RESTful request against iLO 4.</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: RIBCL COMMAND CENTER -->
+    <div id="tab-ribcl" class="tab-content">
+      <div class="explorer-layout">
+        <!-- RIBCL Methods Directory Sidebar -->
+        <div class="endpoint-sidebar">
+          <input type="text" class="search-input" id="ribclSearch" placeholder="Search 160+ RIBCL methods...">
+          <div class="endpoint-list" id="ribclMethodList">
+            <!-- Dynamically populated -->
+            <div style="padding: 10px; color: var(--text-muted);">Loading RIBCL methods...</div>
+          </div>
+        </div>
+
+        <!-- RIBCL Runner -->
+        <div class="request-composer">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="font-size: 1.15rem; font-weight: 700;" id="ribclSelectedMethodName">get_host_data</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted);" id="ribclMethodDoc">Get SMBIOS/Host hardware details via python-hpilo.</p>
+            </div>
+            <button class="btn-primary" id="btnRunRibcl">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              Run Command
+            </button>
+          </div>
+
+          <!-- Quick Command Presets -->
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 0.8rem; color: var(--text-muted);">
+            <span>Quick Presets:</span>
+            <button class="btn-icon" style="padding: 3px 8px; font-size: 0.75rem;" onclick="selectRibclMethod('get_host_power_status')">get_host_power_status</button>
+            <button class="btn-icon" style="padding: 3px 8px; font-size: 0.75rem;" onclick="selectRibclMethod('get_embedded_health')">get_embedded_health</button>
+            <button class="btn-icon" style="padding: 3px 8px; font-size: 0.75rem;" onclick="selectRibclMethod('get_host_data')">get_host_data</button>
+            <button class="btn-icon" style="padding: 3px 8px; font-size: 0.75rem;" onclick="selectRibclMethod('get_all_licenses')">get_all_licenses</button>
+            <button class="btn-icon" style="padding: 3px 8px; font-size: 0.75rem;" onclick="selectRibclMethod('get_network_settings')">get_network_settings</button>
+            <button class="btn-icon" style="padding: 3px 8px; font-size: 0.75rem;" onclick="selectRibclMethod('get_global_settings')">get_global_settings</button>
+          </div>
+
+          <!-- Command Arguments (JSON) -->
+          <div>
+            <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px;">Command Arguments (JSON kwargs, if required):</div>
+            <textarea class="code-editor-area" id="ribclKwargs" style="min-height: 80px;" placeholder="{}"></textarea>
+          </div>
+
+          <!-- Command Output -->
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted);">
+                Execution Output:
+                <span id="ribclElapsedBadge" style="margin-left: 8px; color: var(--text-dim); font-size: 0.75rem;"></span>
+              </div>
+              <button class="btn-icon" style="padding: 3px 10px; font-size: 0.75rem;" onclick="copyRibclResponse()">Copy Output</button>
+            </div>
+            <pre class="response-viewer" id="ribclResponse">Select a RIBCL command and click 'Run Command'.</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 7: LAN & NETWORK ACCESS -->
+    <div id="tab-network" class="tab-content">
+      <div class="glass-panel" style="max-width: 800px; margin: 0 auto;">
+        <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 8px;">Access Across Your Home Network</h3>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 24px;">
+          This web control system is listening on <code style="color: #38bdf8; background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px;">0.0.0.0:8000</code>. Any device connected to your home Wi-Fi or local network can access and control your HP ProLiant ML350 Gen9 server.
+        </p>
+
+        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Home Network URL</div>
+            <div style="font-size: 1.4rem; font-weight: 700; color: #60a5fa; margin-top: 4px;" id="lanDisplayUrl">
+              http://{{ lan_ip }}:{{ lan_port }}
+            </div>
+          </div>
+          <button class="btn-primary" onclick="copyLanUrl()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            Copy URL
+          </button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px;">
+          <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 16px;">
+            <h4 style="font-size: 0.95rem; margin-bottom: 8px; color: #34d399;">Mobile / Tablet Access</h4>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
+              Open Safari, Chrome, or any mobile browser on your iPhone, iPad, or Android phone while connected to your home Wi-Fi, and navigate to <strong style="color: #60a5fa;">http://{{ lan_ip }}:{{ lan_port }}</strong>.
+            </p>
+          </div>
+
+          <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 16px;">
+            <h4 style="font-size: 0.95rem; margin-bottom: 8px; color: #38bdf8;">Hardware Target</h4>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
+              HP iLO 4 Address: <strong style="color: #f3f4f6;">https://192.168.8.53</strong><br>
+              Server: HPE ProLiant ML350 Gen9<br>
+              iLO Firmware: 2.81 (REST & RIBCL Active)
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Safety Confirmation Modal -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-card">
+      <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 8px;" id="modalTitle">Confirm Action</h3>
+      <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;" id="modalBody">
+        Are you sure you want to perform this power action?
+      </p>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn-danger" id="modalConfirmBtn" onclick="modalExecute()">Proceed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-card">
+      <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 16px;">iLO 4 Connection Settings</h3>
+      
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <label style="font-size: 0.82rem; color: var(--text-muted); display: block; margin-bottom: 4px;">iLO 4 IP / Hostname</label>
+          <input type="text" class="search-input" id="cfgHost" value="{{ ilo_host }}" style="margin: 0;">
+        </div>
+        <div>
+          <label style="font-size: 0.82rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Username</label>
+          <input type="text" class="search-input" id="cfgUser" value="Administrator" style="margin: 0;">
+        </div>
+        <div>
+          <label style="font-size: 0.82rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Password</label>
+          <input type="password" class="search-input" id="cfgPassword" placeholder="Leave empty to keep unchanged" style="margin: 0;">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="closeSettingsModal()">Cancel</button>
+        <button class="btn-primary" onclick="saveSettings()">Save & Test</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Application Scripts -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

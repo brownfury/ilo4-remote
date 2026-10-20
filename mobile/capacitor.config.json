@@ -1,0 +1,15 @@
+{
+  "appId": "com.hpe.ilo4remote",
+  "appName": "iLO 4 Remote",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  },
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}
