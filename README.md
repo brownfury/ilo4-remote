@@ -32,8 +32,8 @@ I wrote this project to solve that annoyance. It talks directly to the iLO 4 RES
 
 Pre-built binaries from the GitHub Actions build pipeline:
 
-- **Android (APK)**: [ilo4-remote-v1.0.2.apk](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.2/ilo4-remote-v1.0.2.apk) (~3.6 MB)
-- **iOS (Sideloadable IPA)**: [ilo4-remote-v1.0.2.ipa](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.2/ilo4-remote-v1.0.2.ipa) (~780 KB)
+- **Android (APK)**: [ilo4-remote-v1.0.3.apk](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.3/ilo4-remote-v1.0.3.apk) (~3.6 MB)
+- **iOS (Sideloadable IPA)**: [ilo4-remote-v1.0.3.ipa](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.3/ilo4-remote-v1.0.3.ipa) (~780 KB)
 
 Source releases and checksums are on the [Releases page](https://github.com/brownfury/ilo4-remote/releases).
 
