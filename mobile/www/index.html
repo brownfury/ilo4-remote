@@ -11,330 +11,415 @@
 </head>
 <body>
 
-  <!-- Mobile Top App Bar -->
-  <header class="app-bar">
-    <div class="app-bar-content">
-      <div class="app-brand">
-        <div class="app-logo">HPE</div>
-        <div class="app-title-group">
-          <div class="app-title">iLO 4 Remote</div>
-          <div class="app-subtitle">
-            <span class="status-indicator-dot" id="headerDot"></span>
-            <span id="headerHostLabel">192.168.8.53</span>
-            <span>•</span>
-            <span id="headerLatencyLabel">Offline</span>
+  <!-- ==================== SCREEN 0: SECURE LOGIN & CONNECTION ==================== -->
+  <div id="screen-login" class="login-overlay">
+    <div class="login-container">
+      <div class="login-brand">
+        <div class="login-logo">HPE</div>
+        <h2>iLO 4 Remote</h2>
+        <p>Open-source management client for HP Integrated Lights-Out 4</p>
+      </div>
+
+      <div class="card login-card">
+        <!-- Saved Profiles Selector (if any) -->
+        <div id="profileSelectorRow" style="display: none; margin-bottom: 14px;">
+          <label class="setting-label">Saved Server Profiles</label>
+          <div style="display: flex; gap: 8px;">
+            <select class="mobile-select" id="loginProfileSelect" style="flex: 1;">
+              <option value="">-- Select Saved Server --</option>
+            </select>
+            <button class="icon-btn" id="btnDeleteProfile" title="Delete Profile" style="width: 42px; height: 42px; border-radius: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
           </div>
-        </div>
-      </div>
-      <div class="app-bar-actions">
-        <button class="icon-btn" id="btnHeaderUid" title="UID Beacon LED">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"></circle>
-            <line x1="12" y1="1" x2="12" y2="3"></line>
-            <line x1="12" y1="21" x2="12" y2="23"></line>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          </svg>
-        </button>
-        <button class="icon-btn" id="btnHeaderRefresh" title="Refresh">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Scrollable Screen Container -->
-  <main class="screens-container">
-
-    <!-- SCREEN 1: POWER CONTROLS -->
-    <section id="screen-power" class="screen-view active">
-      <!-- Big Circular Power Dial -->
-      <div class="card power-hero-card">
-        <div class="power-dial-box">
-          <div class="power-glow-ring" id="powerGlowRing"></div>
-          <button class="power-toggle-btn" id="btnBigPower">
-            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-              <line x1="12" y1="2" x2="12" y2="12"></line>
-            </svg>
-            <span id="bigPowerText">POWER</span>
-          </button>
-        </div>
-
-        <div class="power-state-pill" id="powerStatePill">
-          <span class="status-indicator-dot" id="powerPillDot"></span>
-          <span id="powerPillText">CHECKING...</span>
-        </div>
-
-        <div class="server-badge-chip" id="serverModelBadge">
-          HPE ProLiant ML350 Gen9
-        </div>
-      </div>
-
-      <!-- Action Buttons Grid -->
-      <div class="section-title">Power Actions</div>
-      <div class="action-tiles-grid">
-        <div class="action-tile" onclick="triggerPowerAction('on', 'Turn Server ON')">
-          <div class="action-tile-icon green">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-          </div>
-          <div class="action-tile-label">Power ON</div>
-          <div class="action-tile-desc">Boot from standby</div>
-        </div>
-
-        <div class="action-tile" onclick="triggerPowerAction('graceful_shutdown', 'Graceful Shutdown')">
-          <div class="action-tile-icon amber">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-          </div>
-          <div class="action-tile-label">Shutdown</div>
-          <div class="action-tile-desc">Clean OS ACPI</div>
-        </div>
-
-        <div class="action-tile" onclick="triggerPowerAction('push_power_button', 'Press Power Button')">
-          <div class="action-tile-icon blue">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="9"></circle>
-              <path d="M12 7v5"></path>
-            </svg>
-          </div>
-          <div class="action-tile-label">Button Press</div>
-          <div class="action-tile-desc">Virtual push</div>
-        </div>
-
-        <div class="action-tile" onclick="confirmDangerAction('force_off', 'Force Power OFF')">
-          <div class="action-tile-icon red">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            </svg>
-          </div>
-          <div class="action-tile-label">Force OFF</div>
-          <div class="action-tile-desc">Instant cut</div>
-        </div>
-
-        <div class="action-tile" onclick="confirmDangerAction('reset', 'Hard Reboot / Reset')">
-          <div class="action-tile-icon purple">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="23 4 23 10 17 10"></polyline>
-              <polyline points="1 20 1 14 7 14"></polyline>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-            </svg>
-          </div>
-          <div class="action-tile-label">Reset Server</div>
-          <div class="action-tile-desc">Hard reboot</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- SCREEN 2: HARDWARE TELEMETRY -->
-    <section id="screen-telemetry" class="screen-view">
-      <div class="section-title">Hardware Telemetry</div>
-      
-      <div class="card info-card">
-        <div class="info-row">
-          <span class="info-label">Server Model</span>
-          <span class="info-val" id="telModel">ProLiant ML350 Gen9</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Serial Number</span>
-          <span class="info-val font-mono" id="telSerial">CZ254307FB</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">BIOS / ROM</span>
-          <span class="info-val font-mono" id="telBios">P92 v2.92</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Overall Health</span>
-          <span class="pill pill-ok" id="telHealth">OK</span>
-        </div>
-      </div>
-
-      <div class="card info-card">
-        <div class="info-row">
-          <span class="info-label">Processors</span>
-          <span class="info-val" id="telCpu">Dual Intel Xeon E5-2620 v3</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Total Memory</span>
-          <span class="info-val font-bold" id="telMemory">112 GiB DDR4 ECC</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">iLO 4 Firmware</span>
-          <span class="info-val font-mono" id="telIloVer">v2.81</span>
-        </div>
-      </div>
-
-      <div class="section-title">Power Supplies</div>
-      <div id="telPsuList" class="psu-list">
-        <!-- Rendered dynamically -->
-      </div>
-    </section>
-
-    <!-- SCREEN 3: SENSORS & FANS -->
-    <section id="screen-sensors" class="screen-view">
-      <div class="section-title">Sea of Sensors™ (46 Zones)</div>
-      <div class="sensors-scroll-grid" id="sensorsGrid">
-        <div style="color: var(--text-muted); padding: 14px;">Loading thermal sensors...</div>
-      </div>
-
-      <div class="section-title" style="margin-top: 24px;">Cooling Fans (8 Tachometers)</div>
-      <div class="fans-horizontal-scroll" id="fansContainer">
-        <!-- Rendered dynamically -->
-      </div>
-    </section>
-
-    <!-- SCREEN 4: EVENT LOGS -->
-    <section id="screen-logs" class="screen-view">
-      <div style="display: flex; gap: 8px; margin-bottom: 14px;">
-        <button class="filter-chip active" id="btnFilterIML" onclick="switchLogsType('iml')">IML Log</button>
-        <button class="filter-chip" id="btnFilterIEL" onclick="switchLogsType('iel')">iLO Events</button>
-      </div>
-
-      <div class="logs-mobile-list" id="logsList">
-        <div style="color: var(--text-muted); padding: 20px; text-align: center;">Loading logs...</div>
-      </div>
-    </section>
-
-    <!-- SCREEN 5: REST API EXPLORER -->
-    <section id="screen-api" class="screen-view">
-      <div class="section-title">REST API Explorer (128 Endpoints)</div>
-      
-      <div class="card" style="margin-bottom: 14px;">
-        <input type="text" class="mobile-input" id="apiSearch" placeholder="Search endpoints (e.g. Systems, Thermal)..." style="margin-bottom: 10px;">
-        
-        <div class="url-composer-row">
-          <select class="mobile-select" id="apiMethod">
-            <option value="GET">GET</option>
-            <option value="POST">POST</option>
-            <option value="PATCH">PATCH</option>
-            <option value="DELETE">DELETE</option>
-          </select>
-          <input type="text" class="mobile-input font-mono" id="apiPath" value="/rest/v1/Systems/1" style="flex: 1;">
-        </div>
-
-        <div style="display: flex; gap: 6px; overflow-x: auto; padding: 6px 0; margin-bottom: 10px;">
-          <button class="mini-tag" onclick="setApiPreset('/rest/v1/Systems/1')">Systems/1</button>
-          <button class="mini-tag" onclick="setApiPreset('/rest/v1/Chassis/1/Thermal')">Thermal</button>
-          <button class="mini-tag" onclick="setApiPreset('/rest/v1/Chassis/1/Power')">Power</button>
-          <button class="mini-tag" onclick="setApiPreset('/rest/v1/Managers/1')">Manager</button>
-        </div>
-
-        <textarea class="mobile-textarea font-mono" id="apiPayload" placeholder='JSON payload for POST/PATCH'></textarea>
-        
-        <button class="primary-btn" id="btnSendApi" style="margin-top: 10px;">
-          Execute Request
-        </button>
-      </div>
-
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">RESPONSE:</span>
-          <span id="apiStatusBadge"></span>
-        </div>
-        <pre class="mobile-json-viewer" id="apiResponse">Tap Execute Request to inspect live JSON.</pre>
-      </div>
-    </section>
-
-    <!-- SCREEN 6: SETTINGS -->
-    <section id="screen-settings" class="screen-view">
-      <div class="section-title">Connection Settings</div>
-      <div class="card info-card">
-        <div style="margin-bottom: 12px;">
-          <label class="setting-label">Connection Mode</label>
-          <select class="mobile-select" id="cfgMode" style="width: 100%;">
-            <option value="direct">Direct iLO Hardware (Wi-Fi)</option>
-            <option value="gateway">Companion Gateway Server</option>
-          </select>
         </div>
 
         <div style="margin-bottom: 12px;">
-          <label class="setting-label">iLO 4 IP / Hostname</label>
-          <input type="text" class="mobile-input font-mono" id="cfgIloHost" value="192.168.8.53">
+          <label class="setting-label">Connection Mode</label>
+          <div class="mode-toggle-group">
+            <button type="button" class="mode-toggle-btn active" id="btnModeDirect" onclick="setLoginMode('direct')">
+              ⚡ Direct iLO (Wi-Fi)
+            </button>
+            <button type="button" class="mode-toggle-btn" id="btnModeGateway" onclick="setLoginMode('gateway')">
+              🌐 Gateway Mode
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <label class="setting-label" id="lblHostInput">iLO 4 Server IP or Hostname</label>
+          <input type="text" class="mobile-input font-mono" id="loginHost" placeholder="e.g. 192.168.1.100 or ilo.local">
         </div>
 
         <div style="margin-bottom: 12px;">
           <label class="setting-label">Username</label>
-          <input type="text" class="mobile-input" id="cfgUser" value="Administrator">
+          <input type="text" class="mobile-input" id="loginUser" placeholder="Administrator">
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <label class="setting-label">Password</label>
+          <div style="position: relative;">
+            <input type="password" class="mobile-input font-mono" id="loginPassword" placeholder="Enter password" style="padding-right: 42px;">
+            <button type="button" class="btn-eye-toggle" id="btnTogglePassword" onclick="togglePasswordVisibility()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="eyeIcon">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div style="margin-bottom: 16px;">
-          <label class="setting-label">Password</label>
-          <input type="password" class="mobile-input font-mono" id="cfgPassword" placeholder="Enter iLO password">
+          <label class="setting-label">Profile Name (Optional)</label>
+          <input type="text" class="mobile-input" id="loginProfileName" placeholder="e.g. Home Server ML350">
         </div>
 
-        <button class="primary-btn" onclick="saveConnectionSettings()">
-          Save & Connect
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 18px; font-size: 0.8rem; color: var(--text-muted);">
+          <input type="checkbox" id="chkRememberProfile" checked style="cursor: pointer;">
+          <label for="chkRememberProfile" style="cursor: pointer;">Remember this server on device</label>
+        </div>
+
+        <button type="button" class="primary-btn" id="btnLoginConnect" onclick="attemptLogin()">
+          <span id="loginBtnText">Connect to Server</span>
         </button>
+
+        <div id="loginStatusFeedback" class="login-feedback"></div>
       </div>
 
-      <div class="card" style="margin-top: 14px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
-        <strong style="color: #60a5fa;">Open Source Project</strong><br>
-        Developed for HP Integrated Lights-Out 4 (iLO 4) servers.<br>
-        Installable APK for Android & Sideloadable IPA for iOS.
+      <div style="font-size: 0.72rem; color: var(--text-dim); text-align: center; margin-top: 20px; line-height: 1.4;">
+        Direct client-side HTTPS connection.<br>
+        Credentials are stored only on your device and are never sent externally.
       </div>
-    </section>
+    </div>
+  </div>
 
-  </main>
+  <!-- ==================== MAIN APPLICATION DASHBOARD ==================== -->
+  <div id="app-main" style="display: none; height: 100vh; flex-direction: column;">
+    <!-- Mobile Top App Bar -->
+    <header class="app-bar">
+      <div class="app-bar-content">
+        <div class="app-brand">
+          <div class="app-logo">HPE</div>
+          <div class="app-title-group">
+            <div class="app-title">iLO 4 Remote</div>
+            <div class="app-subtitle">
+              <span class="status-indicator-dot" id="headerDot"></span>
+              <span id="headerHostLabel">Connected</span>
+              <span>•</span>
+              <span id="headerLatencyLabel">--</span>
+            </div>
+          </div>
+        </div>
+        <div class="app-bar-actions">
+          <button class="icon-btn" id="btnHeaderUid" title="UID Beacon LED">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            </svg>
+          </button>
+          <button class="icon-btn" id="btnHeaderRefresh" title="Refresh">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/>
+            </svg>
+          </button>
+          <button class="icon-btn" id="btnHeaderDisconnect" title="Disconnect / Switch Server" onclick="showLoginScreen()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
 
-  <!-- Mobile Bottom Tab Navigation -->
-  <nav class="bottom-nav">
-    <button class="nav-item active" data-screen="screen-power">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-        <line x1="12" y1="2" x2="12" y2="12"></line>
-      </svg>
-      <span>Power</span>
-    </button>
+    <!-- Main Scrollable Screen Container -->
+    <main class="screens-container">
 
-    <button class="nav-item" data-screen="screen-telemetry">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-        <line x1="6" y1="6" x2="6.01" y2="6"></line>
-        <line x1="6" y1="18" x2="6.01" y2="18"></line>
-      </svg>
-      <span>Hardware</span>
-    </button>
+      <!-- SCREEN 1: POWER CONTROLS -->
+      <section id="screen-power" class="screen-view active">
+        <!-- Big Circular Power Dial -->
+        <div class="card power-hero-card">
+          <div class="power-dial-box">
+            <div class="power-glow-ring" id="powerGlowRing"></div>
+            <button class="power-toggle-btn" id="btnBigPower">
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                <line x1="12" y1="2" x2="12" y2="12"></line>
+              </svg>
+              <span id="bigPowerText">POWER</span>
+            </button>
+          </div>
 
-    <button class="nav-item" data-screen="screen-sensors">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
-      </svg>
-      <span>Sensors</span>
-    </button>
+          <div class="power-state-pill" id="powerStatePill">
+            <span class="status-indicator-dot" id="powerPillDot"></span>
+            <span id="powerPillText">CHECKING...</span>
+          </div>
 
-    <button class="nav-item" data-screen="screen-logs">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-        <line x1="16" y1="13" x2="8" y2="13"></line>
-        <line x1="16" y1="17" x2="8" y2="17"></line>
-      </svg>
-      <span>Logs</span>
-    </button>
+          <div class="server-badge-chip" id="serverModelBadge">
+            HPE Server
+          </div>
+        </div>
 
-    <button class="nav-item" data-screen="screen-api">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="16 18 22 12 16 6"></polyline>
-        <polyline points="8 6 2 12 8 18"></polyline>
-      </svg>
-      <span>API</span>
-    </button>
+        <!-- Action Buttons Grid -->
+        <div class="section-title">Power Actions</div>
+        <div class="action-tiles-grid">
+          <div class="action-tile" onclick="triggerPowerAction('on', 'Turn Server ON')">
+            <div class="action-tile-icon green">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+            </div>
+            <div class="action-tile-label">Power ON</div>
+            <div class="action-tile-desc">Boot from standby</div>
+          </div>
 
-    <button class="nav-item" data-screen="screen-settings">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-      </svg>
-      <span>Settings</span>
-    </button>
-  </nav>
+          <div class="action-tile" onclick="triggerPowerAction('graceful_shutdown', 'Graceful Shutdown')">
+            <div class="action-tile-icon amber">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+            </div>
+            <div class="action-tile-label">Shutdown</div>
+            <div class="action-tile-desc">Clean OS ACPI</div>
+          </div>
+
+          <div class="action-tile" onclick="triggerPowerAction('push_power_button', 'Press Power Button')">
+            <div class="action-tile-icon blue">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 7v5"></path>
+              </svg>
+            </div>
+            <div class="action-tile-label">Button Press</div>
+            <div class="action-tile-desc">Virtual push</div>
+          </div>
+
+          <div class="action-tile" onclick="confirmDangerAction('force_off', 'Force Power OFF')">
+            <div class="action-tile-icon red">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              </svg>
+            </div>
+            <div class="action-tile-label">Force OFF</div>
+            <div class="action-tile-desc">Instant cut</div>
+          </div>
+
+          <div class="action-tile" onclick="confirmDangerAction('reset', 'Hard Reboot / Reset')">
+            <div class="action-tile-icon purple">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </div>
+            <div class="action-tile-label">Reset Server</div>
+            <div class="action-tile-desc">Hard reboot</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 2: HARDWARE TELEMETRY -->
+      <section id="screen-telemetry" class="screen-view">
+        <div class="section-title">Hardware Telemetry</div>
+        
+        <div class="card info-card">
+          <div class="info-row">
+            <span class="info-label">Server Model</span>
+            <span class="info-val" id="telModel">--</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Serial Number</span>
+            <span class="info-val font-mono" id="telSerial">--</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">BIOS / ROM</span>
+            <span class="info-val font-mono" id="telBios">--</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Overall Health</span>
+            <span class="pill pill-ok" id="telHealth">--</span>
+          </div>
+        </div>
+
+        <div class="card info-card">
+          <div class="info-row">
+            <span class="info-label">Processors</span>
+            <span class="info-val" id="telCpu">--</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Total Memory</span>
+            <span class="info-val font-bold" id="telMemory">--</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">iLO 4 Firmware</span>
+            <span class="info-val font-mono" id="telIloVer">--</span>
+          </div>
+        </div>
+
+        <div class="section-title">Power Supplies</div>
+        <div id="telPsuList" class="psu-list"></div>
+      </section>
+
+      <!-- SCREEN 3: SENSORS & FANS -->
+      <section id="screen-sensors" class="screen-view">
+        <div class="section-title">Sea of Sensors™ Readings</div>
+        <div class="sensors-scroll-grid" id="sensorsGrid">
+          <div style="color: var(--text-muted); padding: 14px;">Loading thermal sensors...</div>
+        </div>
+
+        <div class="section-title" style="margin-top: 24px;">Cooling Fans</div>
+        <div class="fans-horizontal-scroll" id="fansContainer"></div>
+      </section>
+
+      <!-- SCREEN 4: EVENT LOGS -->
+      <section id="screen-logs" class="screen-view">
+        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <button class="filter-chip active" id="btnFilterIML" onclick="switchLogsType('iml')">IML Log</button>
+          <button class="filter-chip" id="btnFilterIEL" onclick="switchLogsType('iel')">iLO Events</button>
+        </div>
+
+        <div class="logs-mobile-list" id="logsList">
+          <div style="color: var(--text-muted); padding: 20px; text-align: center;">Loading logs...</div>
+        </div>
+      </section>
+
+      <!-- SCREEN 5: REST API EXPLORER -->
+      <section id="screen-api" class="screen-view">
+        <div class="section-title">REST API Explorer</div>
+        
+        <div class="card" style="margin-bottom: 14px;">
+          <input type="text" class="mobile-input" id="apiSearch" placeholder="Search endpoints (e.g. Systems, Thermal)..." style="margin-bottom: 10px;">
+          
+          <div class="url-composer-row">
+            <select class="mobile-select" id="apiMethod">
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PATCH">PATCH</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+            <input type="text" class="mobile-input font-mono" id="apiPath" value="/rest/v1/Systems/1" style="flex: 1;">
+          </div>
+
+          <div style="display: flex; gap: 6px; overflow-x: auto; padding: 6px 0; margin-bottom: 10px;">
+            <button class="mini-tag" onclick="setApiPreset('/rest/v1/Systems/1')">Systems/1</button>
+            <button class="mini-tag" onclick="setApiPreset('/rest/v1/Chassis/1/Thermal')">Thermal</button>
+            <button class="mini-tag" onclick="setApiPreset('/rest/v1/Chassis/1/Power')">Power</button>
+            <button class="mini-tag" onclick="setApiPreset('/rest/v1/Managers/1')">Manager</button>
+          </div>
+
+          <textarea class="mobile-textarea font-mono" id="apiPayload" placeholder='JSON payload for POST/PATCH'></textarea>
+          
+          <button class="primary-btn" id="btnSendApi" style="margin-top: 10px;">
+            Execute Request
+          </button>
+        </div>
+
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">RESPONSE:</span>
+            <span id="apiStatusBadge"></span>
+          </div>
+          <pre class="mobile-json-viewer" id="apiResponse">Tap Execute Request to inspect live JSON.</pre>
+        </div>
+      </section>
+
+      <!-- SCREEN 6: SETTINGS & PROFILES -->
+      <section id="screen-settings" class="screen-view">
+        <div class="section-title">Active Server Connection</div>
+        <div class="card info-card">
+          <div class="info-row">
+            <span class="info-label">Mode</span>
+            <span class="info-val font-bold" id="setCurrMode">Direct iLO</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Target Host</span>
+            <span class="info-val font-mono" id="setCurrHost">--</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Active User</span>
+            <span class="info-val" id="setCurrUser">--</span>
+          </div>
+
+          <div style="margin-top: 16px; display: flex; gap: 10px;">
+            <button class="primary-btn" style="background: rgba(255, 255, 255, 0.08); color: #fff;" onclick="showLoginScreen()">
+              Switch / Add Server
+            </button>
+            <button class="primary-btn" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);" onclick="disconnectCurrentServer()">
+              Disconnect
+            </button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 14px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+          <strong style="color: #60a5fa;">iLO 4 Remote (Open Source)</strong><br>
+          Supports direct local Wi-Fi and remote VPN/gateway access to HP iLO 4 servers.
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Mobile Bottom Tab Navigation -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-screen="screen-power">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+          <line x1="12" y1="2" x2="12" y2="12"></line>
+        </svg>
+        <span>Power</span>
+      </button>
+
+      <button class="nav-item" data-screen="screen-telemetry">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+          <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+          <line x1="6" y1="6" x2="6.01" y2="6"></line>
+          <line x1="6" y1="18" x2="6.01" y2="18"></line>
+        </svg>
+        <span>Hardware</span>
+      </button>
+
+      <button class="nav-item" data-screen="screen-sensors">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+        </svg>
+        <span>Sensors</span>
+      </button>
+
+      <button class="nav-item" data-screen="screen-logs">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        <span>Logs</span>
+      </button>
+
+      <button class="nav-item" data-screen="screen-api">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+        <span>API</span>
+      </button>
+
+      <button class="nav-item" data-screen="screen-settings">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+  </div>
 
   <!-- Mobile Toast Message -->
   <div id="toast" class="mobile-toast"></div>

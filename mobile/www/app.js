@@ -1,39 +1,339 @@
-// iLO 4 Remote - Mobile Application Engine
-let config = {
-  mode: localStorage.getItem("ilo_mode") || "gateway", // 'gateway' or 'direct'
-  host: localStorage.getItem("ilo_host") || "192.168.8.53",
-  gateway: localStorage.getItem("ilo_gateway") || "http://192.168.8.124:8000",
-  user: localStorage.getItem("ilo_user") || "Administrator",
-  password: localStorage.getItem("ilo_password") || "",
+// iLO 4 Remote - Secure Mobile Application Controller
+// Zero hardcoded credentials. Connect to any local or remote iLO 4 server.
+
+let activeConfig = {
+  mode: "direct",
+  host: "",
+  user: "Administrator",
+  password: "",
   token: null
 };
 
 let currentPowerState = "Unknown";
 let currentUidState = "Off";
-let autoPollInterval = null;
+let autoPollTimer = null;
+let savedProfiles = [];
 
 document.addEventListener("DOMContentLoaded", () => {
   initBottomNav();
   initPowerControls();
-  initSettingsUI();
+  loadProfilesFromStorage();
   
-  // Initial check
-  checkConnectionAndRefresh();
-  
-  // Auto poll every 4 seconds
-  autoPollInterval = setInterval(pollPowerState, 4000);
+  // Check if we have saved active session credentials
+  const lastHost = localStorage.getItem("ilo_active_host");
+  const lastUser = localStorage.getItem("ilo_active_user");
+  const lastPass = localStorage.getItem("ilo_active_pass");
+  const lastMode = localStorage.getItem("ilo_active_mode") || "direct";
 
-  // Header buttons
+  if (lastHost && lastUser && lastPass) {
+    activeConfig.host = lastHost;
+    activeConfig.user = lastUser;
+    activeConfig.password = lastPass;
+    activeConfig.mode = lastMode;
+
+    // Populate login fields in case user returns to login screen
+    document.getElementById("loginHost").value = lastHost;
+    document.getElementById("loginUser").value = lastUser;
+    document.getElementById("loginPassword").value = lastPass;
+    setLoginMode(lastMode);
+
+    // Auto connect
+    attemptLogin(true);
+  } else {
+    showLoginScreen();
+  }
+
+  // Header quick buttons
   document.getElementById("btnHeaderRefresh")?.addEventListener("click", () => {
-    checkConnectionAndRefresh();
-    showMobileToast("Refreshed data");
+    refreshAllDashboardData();
+    showMobileToast("Refreshed system telemetry");
   });
 
   document.getElementById("btnHeaderUid")?.addEventListener("click", toggleUid);
   document.getElementById("btnSendApi")?.addEventListener("click", executeApiRequest);
 });
 
-/* ---------------- NAVIGATION ---------------- */
+/* ---------------- SERVER PROFILES & LOGIN ---------------- */
+function loadProfilesFromStorage() {
+  try {
+    savedProfiles = JSON.parse(localStorage.getItem("ilo_profiles") || "[]");
+  } catch (e) {
+    savedProfiles = [];
+  }
+  renderProfilesDropdown();
+}
+
+function renderProfilesDropdown() {
+  const row = document.getElementById("profileSelectorRow");
+  const select = document.getElementById("loginProfileSelect");
+  if (!row || !select) return;
+
+  if (savedProfiles.length === 0) {
+    row.style.display = "none";
+    return;
+  }
+
+  row.style.display = "block";
+  select.innerHTML = `<option value="">-- Choose Saved Server (${savedProfiles.length}) --</option>` +
+    savedProfiles.map((p, i) => `<option value="${i}">${escapeHtml(p.name || p.host)} (${p.mode === 'direct' ? 'Direct' : 'Gateway'})</option>`).join("");
+
+  select.onchange = (e) => {
+    const idx = e.target.value;
+    if (idx !== "") {
+      const p = savedProfiles[idx];
+      document.getElementById("loginHost").value = p.host || "";
+      document.getElementById("loginUser").value = p.user || "Administrator";
+      document.getElementById("loginPassword").value = p.password || "";
+      document.getElementById("loginProfileName").value = p.name || "";
+      setLoginMode(p.mode || "direct");
+    }
+  };
+
+  const btnDel = document.getElementById("btnDeleteProfile");
+  if (btnDel) {
+    btnDel.onclick = () => {
+      const idx = select.value;
+      if (idx !== "" && confirm("Delete this saved server profile?")) {
+        savedProfiles.splice(idx, 1);
+        localStorage.setItem("ilo_profiles", JSON.stringify(savedProfiles));
+        renderProfilesDropdown();
+        showMobileToast("Profile removed");
+      }
+    };
+  }
+}
+
+function setLoginMode(mode) {
+  activeConfig.mode = mode;
+  const btnDirect = document.getElementById("btnModeDirect");
+  const btnGateway = document.getElementById("btnModeGateway");
+  const lblHost = document.getElementById("lblHostInput");
+  const inputHost = document.getElementById("loginHost");
+
+  if (mode === "direct") {
+    btnDirect.classList.add("active");
+    btnGateway.classList.remove("active");
+    lblHost.textContent = "iLO 4 Server IP or Hostname";
+    inputHost.placeholder = "e.g. 192.168.8.53 or ilo.local";
+  } else {
+    btnGateway.classList.add("active");
+    btnDirect.classList.remove("active");
+    lblHost.textContent = "Gateway URL";
+    inputHost.placeholder = "e.g. http://192.168.8.124:8000";
+  }
+}
+
+function togglePasswordVisibility() {
+  const input = document.getElementById("loginPassword");
+  const icon = document.getElementById("eyeIcon");
+  if (input.type === "password") {
+    input.type = "text";
+    icon.innerHTML = `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>`;
+  } else {
+    input.type = "password";
+    icon.innerHTML = `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>`;
+  }
+}
+
+async function attemptLogin(isAuto = false) {
+  const host = document.getElementById("loginHost").value.trim();
+  const user = document.getElementById("loginUser").value.trim();
+  const pass = document.getElementById("loginPassword").value;
+  const profileName = document.getElementById("loginProfileName").value.trim();
+  const remember = document.getElementById("chkRememberProfile").checked;
+  const feedback = document.getElementById("loginStatusFeedback");
+  const btn = document.getElementById("btnLoginConnect");
+  const btnText = document.getElementById("loginBtnText");
+
+  if (!host) {
+    showLoginFeedback("Please enter an iLO host or IP address", "error");
+    return;
+  }
+  if (!pass) {
+    showLoginFeedback("Please enter your iLO password", "error");
+    return;
+  }
+
+  // Sanitize host format
+  let cleanHost = host.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+
+  activeConfig.host = cleanHost;
+  activeConfig.user = user || "Administrator";
+  activeConfig.password = pass;
+  activeConfig.token = null;
+
+  btnText.textContent = "Connecting to iLO 4...";
+  btn.disabled = true;
+  showLoginFeedback("Verifying credentials with iLO 4...", "loading");
+
+  const startTime = Date.now();
+  try {
+    let serverModel = "HPE ProLiant Server";
+    
+    if (activeConfig.mode === "direct") {
+      // Direct REST login to iLO 4
+      const token = await directLogin();
+      const sys = await iloRequest("/rest/v1/Systems/1");
+      serverModel = sys.Model || "ProLiant ML350 Gen9";
+      currentPowerState = sys.PowerState || "Unknown";
+    } else {
+      // Companion gateway mode
+      const targetGateway = host.startsWith("http") ? host : `http://${host}`;
+      activeConfig.gateway = targetGateway;
+      const statusRes = await fetch(`${targetGateway}/api/status`);
+      const statusData = await statusRes.json();
+      if (statusData.status !== "connected") {
+        throw new Error(statusData.error || "Gateway reported iLO connection failure");
+      }
+      currentPowerState = statusData.power_state || "Unknown";
+    }
+
+    const elapsed = Date.now() - startTime;
+    showLoginFeedback(`✓ Connected to ${serverModel} (${elapsed}ms)!`, "success");
+
+    // Save profile if requested
+    if (remember) {
+      localStorage.setItem("ilo_active_host", activeConfig.host);
+      localStorage.setItem("ilo_active_user", activeConfig.user);
+      localStorage.setItem("ilo_active_pass", activeConfig.password);
+      localStorage.setItem("ilo_active_mode", activeConfig.mode);
+
+      // Save into profiles list if name given or update existing
+      const pName = profileName || activeConfig.host;
+      const existingIdx = savedProfiles.findIndex(p => p.host === activeConfig.host);
+      const newP = {
+        name: pName,
+        host: activeConfig.host,
+        user: activeConfig.user,
+        password: activeConfig.password,
+        mode: activeConfig.mode
+      };
+      if (existingIdx >= 0) {
+        savedProfiles[existingIdx] = newP;
+      } else {
+        savedProfiles.push(newP);
+      }
+      localStorage.setItem("ilo_profiles", JSON.stringify(savedProfiles));
+      renderProfilesDropdown();
+    }
+
+    setTimeout(() => {
+      document.getElementById("screen-login").style.display = "none";
+      document.getElementById("app-main").style.display = "flex";
+      updateHeaderLabels(serverModel, `${elapsed}ms`);
+      updatePowerUI(currentPowerState);
+      refreshAllDashboardData();
+      startAutoPoll();
+    }, 600);
+
+  } catch (err) {
+    showLoginFeedback(`✗ Connection Failed: ${err.message}`, "error");
+    btnText.textContent = "Connect to Server";
+    btn.disabled = false;
+    showLoginScreen();
+  }
+}
+
+function showLoginFeedback(msg, type) {
+  const el = document.getElementById("loginStatusFeedback");
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `login-feedback ${type}`;
+}
+
+function showLoginScreen() {
+  stopAutoPoll();
+  document.getElementById("app-main").style.display = "none";
+  document.getElementById("screen-login").style.display = "flex";
+  const btn = document.getElementById("btnLoginConnect");
+  const btnText = document.getElementById("loginBtnText");
+  if (btn) btn.disabled = false;
+  if (btnText) btnText.textContent = "Connect to Server";
+}
+
+function disconnectCurrentServer() {
+  if (confirm("Disconnect and log out from this server?")) {
+    activeConfig.token = null;
+    localStorage.removeItem("ilo_active_pass");
+    showMobileToast("Disconnected");
+    showLoginScreen();
+  }
+}
+
+function updateHeaderLabels(model, latencyText) {
+  document.getElementById("headerHostLabel").textContent = activeConfig.host;
+  document.getElementById("headerLatencyLabel").textContent = latencyText;
+  document.getElementById("serverModelBadge").textContent = model;
+  document.getElementById("headerDot").className = "status-indicator-dot";
+  
+  // Settings tab details
+  document.getElementById("setCurrMode").textContent = activeConfig.mode === "direct" ? "Direct iLO" : "Companion Gateway";
+  document.getElementById("setCurrHost").textContent = activeConfig.host;
+  document.getElementById("setCurrUser").textContent = activeConfig.user;
+}
+
+/* ---------------- HTTP TRANSPORT ENGINE ---------------- */
+async function iloRequest(endpoint, method = "GET", body = null) {
+  if (activeConfig.mode === "gateway") {
+    const base = activeConfig.gateway || `http://${activeConfig.host}`;
+    if (endpoint.startsWith("/api/")) {
+      const res = await fetch(`${base}${endpoint}`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      return await res.json();
+    } else {
+      const res = await fetch(`${base}/api/rest/proxy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method, path: endpoint, body })
+      });
+      const data = await res.json();
+      if (data.status === "error") throw new Error(data.error);
+      return data.data;
+    }
+  } else {
+    // Direct mode via HTTPS to iLO
+    const base = `https://${activeConfig.host}`;
+    if (!activeConfig.token) {
+      await directLogin();
+    }
+    const res = await fetch(`${base}${endpoint}`, {
+      method,
+      headers: {
+        "X-Auth-Token": activeConfig.token,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+
+    if (res.status === 401) {
+      await directLogin();
+      return await iloRequest(endpoint, method, body);
+    }
+    return await res.json();
+  }
+}
+
+async function directLogin() {
+  const url = `https://${activeConfig.host}/rest/v1/SessionService/Sessions`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ UserName: activeConfig.user, Password: activeConfig.password })
+  });
+  if (!res.ok) {
+    throw new Error(`Authentication failed (HTTP ${res.status}). Verify IP and credentials.`);
+  }
+  const token = res.headers.get("X-Auth-Token") || res.headers.get("x-auth-token");
+  if (!token) throw new Error("iLO did not return an X-Auth-Token");
+  activeConfig.token = token;
+  return token;
+}
+
+/* ---------------- TABS & NAVIGATION ---------------- */
 function initBottomNav() {
   const items = document.querySelectorAll(".nav-item");
   items.forEach(btn => {
@@ -54,126 +354,16 @@ function initBottomNav() {
   });
 }
 
-/* ---------------- HTTP TRANSPORT ADAPTER ---------------- */
-// Supports both Gateway mode and Direct iLO REST mode
-async function iloRequest(endpoint, method = "GET", body = null) {
-  if (config.mode === "gateway") {
-    // Companion gateway proxy
-    if (endpoint.startsWith("/api/")) {
-      const res = await fetch(`${config.gateway}${endpoint}`, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: body ? JSON.stringify(body) : undefined
-      });
-      return await res.json();
+/* ---------------- POWER CONTROLS ---------------- */
+function initPowerControls() {
+  const btn = document.getElementById("btnBigPower");
+  btn?.addEventListener("click", () => {
+    if (currentPowerState.toLowerCase() === "on") {
+      confirmDangerAction("graceful_shutdown", "Graceful Shutdown");
     } else {
-      // Proxy REST request through gateway
-      const res = await fetch(`${config.gateway}/api/rest/proxy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ method, path: endpoint, body })
-      });
-      const data = await res.json();
-      if (data.status === "error") throw new Error(data.error);
-      return data.data;
+      triggerPowerAction("on", "Power On");
     }
-  } else {
-    // Direct mode to https://<ilo_host>/rest/v1
-    const base = `https://${config.host}`;
-    if (!config.token) {
-      await directLogin();
-    }
-    const res = await fetch(`${base}${endpoint}`, {
-      method,
-      headers: {
-        "X-Auth-Token": config.token,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: body ? JSON.stringify(body) : undefined
-    });
-
-    if (res.status === 401) {
-      await directLogin();
-      return await iloRequest(endpoint, method, body);
-    }
-    return await res.json();
-  }
-}
-
-async function directLogin() {
-  const url = `https://${config.host}/rest/v1/SessionService/Sessions`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ UserName: config.user, Password: config.password })
   });
-  const token = res.headers.get("X-Auth-Token") || res.headers.get("x-auth-token");
-  if (!token) throw new Error("Could not obtain X-Auth-Token from iLO");
-  config.token = token;
-  return token;
-}
-
-/* ---------------- CONNECTION & POWER ---------------- */
-async function checkConnectionAndRefresh() {
-  const dot = document.getElementById("headerDot");
-  const lat = document.getElementById("headerLatencyLabel");
-  const hostLabel = document.getElementById("headerHostLabel");
-
-  hostLabel.textContent = config.host;
-  lat.textContent = "Connecting...";
-
-  const start = Date.now();
-  try {
-    if (config.mode === "gateway") {
-      const data = await iloRequest("/api/status");
-      const elapsed = Date.now() - start;
-      if (data.status === "connected") {
-        dot.className = "status-indicator-dot";
-        lat.textContent = `${elapsed}ms`;
-        currentPowerState = data.power_state || "Unknown";
-        updatePowerUI(currentPowerState);
-      } else {
-        throw new Error(data.error || "Gateway error");
-      }
-    } else {
-      await directLogin();
-      const sys = await iloRequest("/rest/v1/Systems/1");
-      const elapsed = Date.now() - start;
-      dot.className = "status-indicator-dot";
-      lat.textContent = `${elapsed}ms (Direct)`;
-      currentPowerState = sys.PowerState || "Unknown";
-      updatePowerUI(currentPowerState);
-    }
-  } catch (err) {
-    dot.className = "status-indicator-dot offline";
-    lat.textContent = "Offline";
-    console.error("Connection check failed:", err);
-  }
-}
-
-async function pollPowerState() {
-  try {
-    if (config.mode === "gateway") {
-      const data = await iloRequest("/api/power/status");
-      if (data.power_state) {
-        currentPowerState = data.power_state;
-        updatePowerUI(currentPowerState);
-      }
-      if (data.uid_status) {
-        currentUidState = data.uid_status;
-        updateUidUI(currentUidState);
-      }
-    } else {
-      const sys = await iloRequest("/rest/v1/Systems/1");
-      if (sys && sys.PowerState) {
-        currentPowerState = sys.PowerState;
-        updatePowerUI(currentPowerState);
-      }
-    }
-  } catch (e) {
-    // Ignore periodic poll failure
-  }
 }
 
 function updatePowerUI(state) {
@@ -203,21 +393,10 @@ function updatePowerUI(state) {
   }
 }
 
-function initPowerControls() {
-  const btn = document.getElementById("btnBigPower");
-  btn?.addEventListener("click", () => {
-    if (currentPowerState.toLowerCase() === "on") {
-      confirmDangerAction("graceful_shutdown", "Graceful Shutdown");
-    } else {
-      triggerPowerAction("on", "Power On");
-    }
-  });
-}
-
 async function triggerPowerAction(action, friendlyName) {
   showMobileToast(`Issuing ${friendlyName}...`);
   try {
-    if (config.mode === "gateway") {
+    if (activeConfig.mode === "gateway") {
       await iloRequest("/api/power/action", "POST", { action });
     } else {
       const resetMap = {
@@ -250,7 +429,7 @@ async function toggleUid() {
   const newState = (currentUidState.toLowerCase() === "on" || currentUidState.toLowerCase() === "illuminated") ? "off" : "on";
   showMobileToast(`UID Beacon ${newState.toUpperCase()}...`);
   try {
-    if (config.mode === "gateway") {
+    if (activeConfig.mode === "gateway") {
       const res = await iloRequest("/api/uid/toggle", "POST", { state: newState });
       currentUidState = res.uid_status;
     } else {
@@ -279,7 +458,7 @@ function updateUidUI(state) {
 /* ---------------- TELEMETRY ---------------- */
 async function loadTelemetry() {
   try {
-    const data = (config.mode === "gateway") 
+    const data = (activeConfig.mode === "gateway") 
       ? await iloRequest("/api/system/summary") 
       : { system: await iloRequest("/rest/v1/Systems/1"), manager: await iloRequest("/rest/v1/Managers/1") };
 
@@ -308,13 +487,13 @@ async function loadTelemetry() {
 async function loadPowerSupplies() {
   const list = document.getElementById("telPsuList");
   try {
-    const data = (config.mode === "gateway")
+    const data = (activeConfig.mode === "gateway")
       ? await iloRequest("/api/system/power")
       : await iloRequest("/rest/v1/Chassis/1/Power");
 
     const psus = data.power_supplies || data.PowerSupplies || [];
     if (psus.length === 0) {
-      list.innerHTML = `<div style="color: var(--text-muted); font-size: 0.8rem;">No PSUs found.</div>`;
+      list.innerHTML = `<div style="color: var(--text-muted); font-size: 0.8rem;">No PSUs detected.</div>`;
       return;
     }
 
@@ -335,12 +514,12 @@ async function loadPowerSupplies() {
   }
 }
 
-/* ---------------- SENSORS ---------------- */
+/* ---------------- SENSORS & FANS ---------------- */
 async function loadSensors() {
   const grid = document.getElementById("sensorsGrid");
   const fans = document.getElementById("fansContainer");
   try {
-    const data = (config.mode === "gateway")
+    const data = (activeConfig.mode === "gateway")
       ? await iloRequest("/api/system/thermal")
       : await iloRequest("/rest/v1/Chassis/1/Thermal");
 
@@ -386,7 +565,7 @@ async function loadLogs(type = "iml") {
 
   try {
     let entries = [];
-    if (config.mode === "gateway") {
+    if (activeConfig.mode === "gateway") {
       const data = await iloRequest(`/api/logs/${type}`);
       entries = data.entries || [];
     } else {
@@ -461,31 +640,49 @@ async function executeApiRequest() {
   }
 }
 
-/* ---------------- SETTINGS ---------------- */
-function initSettingsUI() {
-  document.getElementById("cfgMode").value = config.mode;
-  document.getElementById("cfgIloHost").value = config.host;
-  document.getElementById("cfgUser").value = config.user;
-  document.getElementById("cfgPassword").value = config.password;
+/* ---------------- POLLING & REFRESH ---------------- */
+function startAutoPoll() {
+  stopAutoPoll();
+  autoPollTimer = setInterval(pollPowerState, 4000);
 }
 
-function saveConnectionSettings() {
-  config.mode = document.getElementById("cfgMode").value;
-  config.host = document.getElementById("cfgIloHost").value.trim();
-  config.user = document.getElementById("cfgUser").value.trim();
-  config.password = document.getElementById("cfgPassword").value;
-  config.token = null;
-
-  localStorage.setItem("ilo_mode", config.mode);
-  localStorage.setItem("ilo_host", config.host);
-  localStorage.setItem("ilo_user", config.user);
-  localStorage.setItem("ilo_password", config.password);
-
-  showMobileToast("Settings saved. Testing connection...");
-  checkConnectionAndRefresh();
+function stopAutoPoll() {
+  if (autoPollTimer) {
+    clearInterval(autoPollTimer);
+    autoPollTimer = null;
+  }
 }
 
-/* ---------------- TOAST ---------------- */
+async function pollPowerState() {
+  try {
+    if (activeConfig.mode === "gateway") {
+      const data = await iloRequest("/api/power/status");
+      if (data.power_state) {
+        currentPowerState = data.power_state;
+        updatePowerUI(currentPowerState);
+      }
+      if (data.uid_status) {
+        currentUidState = data.uid_status;
+        updateUidUI(currentUidState);
+      }
+    } else {
+      const sys = await iloRequest("/rest/v1/Systems/1");
+      if (sys && sys.PowerState) {
+        currentPowerState = sys.PowerState;
+        updatePowerUI(currentPowerState);
+      }
+    }
+  } catch (e) {
+    // Ignore minor periodic poll failures
+  }
+}
+
+function refreshAllDashboardData() {
+  pollPowerState();
+  loadTelemetry();
+}
+
+/* ---------------- TOAST UTILITY ---------------- */
 function showMobileToast(msg) {
   const toast = document.getElementById("toast");
   if (!toast) return;
