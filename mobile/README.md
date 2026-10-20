@@ -1,59 +1,49 @@
-# 📱 iLO 4 Remote - Mobile Application (Android & iOS)
+# ilo4-remote (mobile)
 
-> *"A small effort for the homelab and HPE community to give our trusted Gen8 and Gen9 servers the reliable mobile experience they deserve."*
-> — Dibya Mahakur ([@brownfury](https://github.com/brownfury))
-
----
-
-## 📖 The Story Behind This Project
-
-For years, owners of **HPE ProLiant Gen8 and Gen9 servers** (like the ML350, DL380, and DL360) have been stuck with an abandoned, non-functional official HP iLO app on modern iOS and Android versions. Typing in a host address and credentials almost always ends in infinite hangs, silent failures, or SSL handshake aborts.
-
-**iLO 4 Remote** was built to solve this:
-- **Direct-to-Hardware**: Speaks directly to your iLO 4 over local Wi-Fi or VPN using native HTTPS REST (`/rest/v1`).
-- **Zero Configuration Needed on the Host**: No agents, daemons, or middleman servers required.
-- **Universal Compatibility**: Works out-of-the-box on both Android smartphones and iPhones/iPads.
-- **Production & Homelab Ready**: Supports power cycling, Sea of Sensors thermal monitoring, cooling fan duty cycles, diagnostic logs, and raw REST exploration.
+Capacitor-based native mobile application for Android and iOS.
 
 ---
 
-## 📦 Direct Downloads
+### Structure
 
-- 🍏 **Apple iOS (IPA)**: [Download `ilo4-remote-v1.0.2.ipa`](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.2/ilo4-remote-v1.0.2.ipa)
-- 🤖 **Android (APK)**: [Download `ilo4-remote-v1.0.2.apk`](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.2/ilo4-remote-v1.0.2.apk)
+- `www/`: Mobile web application assets (HTML, CSS, vanilla JS controller).
+- `android/`: Native Android project with Gradle wrapper, Capacitor Android runtime, and network security configuration.
+- `ios/`: Native Xcode workspace (`App.xcworkspace`) with Podfile and Capacitor iOS runtime.
 
 ---
-
-## 🛠️ Building the Mobile App Locally
 
 ### Prerequisites
-- Node.js 18+ & npm
-- JDK 17 (Adoptium Temurin)
-- Android SDK (API 33+)
-- Xcode (for iOS builds on macOS)
 
-### Quick Build
+- Node.js 18 or newer
+- JDK 17 (Temurin or OpenJDK)
+- Android SDK (API level 33+)
+- Xcode 15+ (for local iOS builds on macOS)
+
+---
+
+### Development & Build
+
 ```bash
 # 1. Install dependencies
-cd mobile
 npm install
 
-# 2. Sync web assets into native platform directories
+# 2. Sync web assets into native platform projects
 npx cap sync
 
 # 3. Build Android APK
 cd android
 ./gradlew assembleDebug
 
-# Output APK:
+# Output APK path:
 # android/app/build/outputs/apk/debug/app-debug.apk
 
-# 4. Open iOS project in Xcode (macOS only)
+# 4. Open iOS project in Xcode
 cd ../ios/App
 open App.xcworkspace
 ```
 
 ---
 
-## 📄 License
-MIT License. Free and open source for the community.
+### CI/CD
+
+Automated builds run on tag pushes via `.github/workflows/build-and-release.yml` using GitHub-hosted `ubuntu-latest` and `macos-14` runners.
