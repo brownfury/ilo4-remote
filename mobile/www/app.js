@@ -1,8 +1,44 @@
 // iLO 4 Remote - Secure Mobile Application Controller
-// Zero hardcoded credentials. Connect to any local or remote iLO 4 server.
+// Zero hardcoded credentials. Connect directly to any iLO 4 server on your network.
+
+const Storage = {
+  async get(key, defaultVal = null) {
+    try {
+      if (window.Capacitor?.Plugins?.Preferences) {
+        const { value } = await window.Capacitor.Plugins.Preferences.get({ key });
+        if (value !== null && value !== undefined) return value;
+      }
+    } catch (e) {
+      console.warn("Storage get failed:", e);
+    }
+    const val = localStorage.getItem(key);
+    return val !== null ? val : defaultVal;
+  },
+
+  async set(key, value) {
+    try {
+      if (window.Capacitor?.Plugins?.Preferences) {
+        await window.Capacitor.Plugins.Preferences.set({ key, value: String(value) });
+      }
+    } catch (e) {
+      console.warn("Storage set failed:", e);
+    }
+    localStorage.setItem(key, String(value));
+  },
+
+  async remove(key) {
+    try {
+      if (window.Capacitor?.Plugins?.Preferences) {
+        await window.Capacitor.Plugins.Preferences.remove({ key });
+      }
+    } catch (e) {
+      console.warn("Storage remove failed:", e);
+    }
+    localStorage.removeItem(key);
+  }
+};
 
 let activeConfig = {
-  mode: "direct",
   host: "",
   user: "Administrator",
   password: "",
@@ -14,31 +50,34 @@ let currentUidState = "Off";
 let autoPollTimer = null;
 let savedProfiles = [];
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   initBottomNav();
   initPowerControls();
-  loadProfilesFromStorage();
+  await loadProfilesFromStorage();
   
-  // Check if we have saved active session credentials
-  const lastHost = localStorage.getItem("ilo_active_host");
-  const lastUser = localStorage.getItem("ilo_active_user");
-  const lastPass = localStorage.getItem("ilo_active_pass");
-  const lastMode = localStorage.getItem("ilo_active_mode") || "direct";
+  // Load saved credentials from persistent device storage
+  const lastHost = await Storage.get("ilo_active_host");
+  const lastUser = await Storage.get("ilo_active_user");
+  const lastPass = await Storage.get("ilo_active_pass");
+  const autoConnect = (await Storage.get("ilo_auto_connect", "true")) !== "false";
+
+  if (lastHost) document.getElementById("loginHost").value = lastHost;
+  if (lastUser) document.getElementById("loginUser").value = lastUser;
+  if (lastPass) document.getElementById("loginPassword").value = lastPass;
+  const chkAuto = document.getElementById("chkAutoConnect");
+  if (chkAuto) chkAuto.checked = autoConnect;
 
   if (lastHost && lastUser && lastPass) {
-    activeConfig.host = lastHost;
+    activeConfig.host = lastHost.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
     activeConfig.user = lastUser;
     activeConfig.password = lastPass;
-    activeConfig.mode = lastMode;
 
-    // Populate login fields in case user returns to login screen
-    document.getElementById("loginHost").value = lastHost;
-    document.getElementById("loginUser").value = lastUser;
-    document.getElementById("loginPassword").value = lastPass;
-    setLoginMode(lastMode);
-
-    // Auto connect
-    attemptLogin(true);
+    if (autoConnect) {
+      // Connect automatically without user needing to type or click
+      attemptLogin(true);
+    } else {
+      showLoginScreen();
+    }
   } else {
     showLoginScreen();
   }
@@ -54,9 +93,10 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ---------------- SERVER PROFILES & LOGIN ---------------- */
-function loadProfilesFromStorage() {
+async function loadProfilesFromStorage() {
   try {
-    savedProfiles = JSON.parse(localStorage.getItem("ilo_profiles") || "[]");
+    const raw = await Storage.get("ilo_profiles", "[]");
+    savedProfiles = JSON.parse(raw || "[]");
   } catch (e) {
     savedProfiles = [];
   }
@@ -75,7 +115,7 @@ function renderProfilesDropdown() {
 
   row.style.display = "block";
   select.innerHTML = `<option value="">-- Choose Saved Server (${savedProfiles.length}) --</option>` +
-    savedProfiles.map((p, i) => `<option value="${i}">${escapeHtml(p.name || p.host)} (${p.mode === 'direct' ? 'Direct' : 'Gateway'})</option>`).join("");
+    savedProfiles.map((p, i) => `<option value="${i}">${escapeHtml(p.name || p.host)}</option>`).join("");
 
   select.onchange = (e) => {
     const idx = e.target.value;
@@ -85,41 +125,20 @@ function renderProfilesDropdown() {
       document.getElementById("loginUser").value = p.user || "Administrator";
       document.getElementById("loginPassword").value = p.password || "";
       document.getElementById("loginProfileName").value = p.name || "";
-      setLoginMode(p.mode || "direct");
     }
   };
 
   const btnDel = document.getElementById("btnDeleteProfile");
   if (btnDel) {
-    btnDel.onclick = () => {
+    btnDel.onclick = async () => {
       const idx = select.value;
       if (idx !== "" && confirm("Delete this saved server profile?")) {
         savedProfiles.splice(idx, 1);
-        localStorage.setItem("ilo_profiles", JSON.stringify(savedProfiles));
+        await Storage.set("ilo_profiles", JSON.stringify(savedProfiles));
         renderProfilesDropdown();
         showMobileToast("Profile removed");
       }
     };
-  }
-}
-
-function setLoginMode(mode) {
-  activeConfig.mode = mode;
-  const btnDirect = document.getElementById("btnModeDirect");
-  const btnGateway = document.getElementById("btnModeGateway");
-  const lblHost = document.getElementById("lblHostInput");
-  const inputHost = document.getElementById("loginHost");
-
-  if (mode === "direct") {
-    btnDirect.classList.add("active");
-    btnGateway.classList.remove("active");
-    lblHost.textContent = "iLO 4 Server IP or Hostname";
-    inputHost.placeholder = "e.g. 192.168.8.53 or ilo.local";
-  } else {
-    btnGateway.classList.add("active");
-    btnDirect.classList.remove("active");
-    lblHost.textContent = "Gateway URL";
-    inputHost.placeholder = "e.g. http://192.168.8.124:8000";
   }
 }
 
@@ -140,8 +159,8 @@ async function attemptLogin(isAuto = false) {
   const user = document.getElementById("loginUser").value.trim();
   const pass = document.getElementById("loginPassword").value;
   const profileName = document.getElementById("loginProfileName").value.trim();
-  const remember = document.getElementById("chkRememberProfile").checked;
-  const feedback = document.getElementById("loginStatusFeedback");
+  const remember = document.getElementById("chkRememberProfile")?.checked ?? true;
+  const autoConnect = document.getElementById("chkAutoConnect")?.checked ?? true;
   const btn = document.getElementById("btnLoginConnect");
   const btnText = document.getElementById("loginBtnText");
 
@@ -164,56 +183,40 @@ async function attemptLogin(isAuto = false) {
 
   btnText.textContent = "Connecting to iLO 4...";
   btn.disabled = true;
-  showLoginFeedback("Verifying credentials with iLO 4...", "loading");
+  showLoginFeedback("Connecting directly to iLO 4 via HTTPS...", "loading");
 
   const startTime = Date.now();
   try {
-    let serverModel = "HPE ProLiant Server";
-    
-    if (activeConfig.mode === "direct") {
-      // Direct REST login to iLO 4
-      const token = await directLogin();
-      const sys = await iloRequest("/rest/v1/Systems/1");
-      serverModel = sys.Model || "ProLiant ML350 Gen9";
-      currentPowerState = sys.PowerState || "Unknown";
-    } else {
-      // Companion gateway mode
-      const targetGateway = host.startsWith("http") ? host : `http://${host}`;
-      activeConfig.gateway = targetGateway;
-      const statusRes = await httpRequest({ url: `${targetGateway}/api/status` });
-      const statusData = await statusRes.json();
-      if (statusData.status !== "connected") {
-        throw new Error(statusData.error || "Gateway reported iLO connection failure");
-      }
-      currentPowerState = statusData.power_state || "Unknown";
-    }
+    const token = await directLogin();
+    const sys = await iloRequest("/rest/v1/Systems/1");
+    const serverModel = sys.Model || "ProLiant ML350 Gen9";
+    currentPowerState = sys.PowerState || "Unknown";
 
     const elapsed = Date.now() - startTime;
     showLoginFeedback(`✓ Connected to ${serverModel} (${elapsed}ms)!`, "success");
 
-    // Save profile if requested
+    // Save credentials persistently on device
     if (remember) {
-      localStorage.setItem("ilo_active_host", activeConfig.host);
-      localStorage.setItem("ilo_active_user", activeConfig.user);
-      localStorage.setItem("ilo_active_pass", activeConfig.password);
-      localStorage.setItem("ilo_active_mode", activeConfig.mode);
+      await Storage.set("ilo_active_host", activeConfig.host);
+      await Storage.set("ilo_active_user", activeConfig.user);
+      await Storage.set("ilo_active_pass", activeConfig.password);
+      await Storage.set("ilo_auto_connect", autoConnect ? "true" : "false");
 
-      // Save into profiles list if name given or update existing
+      // Save or update profile in profiles list
       const pName = profileName || activeConfig.host;
       const existingIdx = savedProfiles.findIndex(p => p.host === activeConfig.host);
       const newP = {
         name: pName,
         host: activeConfig.host,
         user: activeConfig.user,
-        password: activeConfig.password,
-        mode: activeConfig.mode
+        password: activeConfig.password
       };
       if (existingIdx >= 0) {
         savedProfiles[existingIdx] = newP;
       } else {
         savedProfiles.push(newP);
       }
-      localStorage.setItem("ilo_profiles", JSON.stringify(savedProfiles));
+      await Storage.set("ilo_profiles", JSON.stringify(savedProfiles));
       renderProfilesDropdown();
     }
 
@@ -224,7 +227,7 @@ async function attemptLogin(isAuto = false) {
       updatePowerUI(currentPowerState);
       refreshAllDashboardData();
       startAutoPoll();
-    }, 600);
+    }, 500);
 
   } catch (err) {
     showLoginFeedback(`✗ Connection Failed: ${err.message}`, "error");
@@ -252,9 +255,8 @@ function showLoginScreen() {
 }
 
 function disconnectCurrentServer() {
-  if (confirm("Disconnect and log out from this server?")) {
+  if (confirm("Disconnect from this server?")) {
     activeConfig.token = null;
-    localStorage.removeItem("ilo_active_pass");
     showMobileToast("Disconnected");
     showLoginScreen();
   }
@@ -267,7 +269,6 @@ function updateHeaderLabels(model, latencyText) {
   document.getElementById("headerDot").className = "status-indicator-dot";
   
   // Settings tab details
-  document.getElementById("setCurrMode").textContent = activeConfig.mode === "direct" ? "Direct iLO" : "Companion Gateway";
   document.getElementById("setCurrHost").textContent = activeConfig.host;
   document.getElementById("setCurrUser").textContent = activeConfig.user;
 }
@@ -315,50 +316,26 @@ async function httpRequest({ url, method = "GET", headers = {}, data = null }) {
 }
 
 async function iloRequest(endpoint, method = "GET", body = null) {
-  if (activeConfig.mode === "gateway") {
-    const base = activeConfig.gateway || `http://${activeConfig.host}`;
-    if (endpoint.startsWith("/api/")) {
-      const res = await httpRequest({
-        url: `${base}${endpoint}`,
-        method,
-        headers: { "Content-Type": "application/json" },
-        data: body
-      });
-      return await res.json();
-    } else {
-      const res = await httpRequest({
-        url: `${base}/api/rest/proxy`,
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        data: { method, path: endpoint, body }
-      });
-      const data = await res.json();
-      if (data.status === "error") throw new Error(data.error);
-      return data.data;
-    }
-  } else {
-    // Direct mode via HTTPS to iLO
-    const base = `https://${activeConfig.host}`;
-    if (!activeConfig.token) {
-      await directLogin();
-    }
-    const res = await httpRequest({
-      url: `${base}${endpoint}`,
-      method,
-      headers: {
-        "X-Auth-Token": activeConfig.token,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      data: body
-    });
-
-    if (res.status === 401) {
-      await directLogin();
-      return await iloRequest(endpoint, method, body);
-    }
-    return await res.json();
+  const base = `https://${activeConfig.host}`;
+  if (!activeConfig.token) {
+    await directLogin();
   }
+  const res = await httpRequest({
+    url: `${base}${endpoint}`,
+    method,
+    headers: {
+      "X-Auth-Token": activeConfig.token,
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    data: body
+  });
+
+  if (res.status === 401) {
+    await directLogin();
+    return await iloRequest(endpoint, method, body);
+  }
+  return await res.json();
 }
 
 async function directLogin() {
@@ -441,21 +418,17 @@ function updatePowerUI(state) {
 async function triggerPowerAction(action, friendlyName) {
   showMobileToast(`Issuing ${friendlyName}...`);
   try {
-    if (activeConfig.mode === "gateway") {
-      await iloRequest("/api/power/action", "POST", { action });
-    } else {
-      const resetMap = {
-        on: "On",
-        force_off: "ForceOff",
-        graceful_shutdown: "PushPowerButton",
-        push_power_button: "PushPowerButton",
-        reset: "ForceRestart"
-      };
-      await iloRequest("/rest/v1/Systems/1", "POST", {
-        Action: "Reset",
-        ResetType: resetMap[action] || "On"
-      });
-    }
+    const resetMap = {
+      on: "On",
+      force_off: "ForceOff",
+      graceful_shutdown: "PushPowerButton",
+      push_power_button: "PushPowerButton",
+      reset: "ForceRestart"
+    };
+    await iloRequest("/rest/v1/Systems/1", "POST", {
+      Action: "Reset",
+      ResetType: resetMap[action] || "On"
+    });
     showMobileToast(`✓ ${friendlyName} executed`);
     setTimeout(pollPowerState, 1500);
   } catch (err) {
@@ -471,18 +444,13 @@ function confirmDangerAction(action, friendlyName) {
 
 /* ---------------- UID BEACON ---------------- */
 async function toggleUid() {
-  const newState = (currentUidState.toLowerCase() === "on" || currentUidState.toLowerCase() === "illuminated") ? "off" : "on";
+  const newState = (currentUidState.toLowerCase() === "on" || currentUidState.toLowerCase() === "illuminated" || currentUidState.toLowerCase() === "lit") ? "Off" : "Lit";
   showMobileToast(`UID Beacon ${newState.toUpperCase()}...`);
   try {
-    if (activeConfig.mode === "gateway") {
-      const res = await iloRequest("/api/uid/toggle", "POST", { state: newState });
-      currentUidState = res.uid_status;
-    } else {
-      await iloRequest("/rest/v1/Systems/1", "PATCH", {
-        IndicatorLED: (newState === "on" ? "Lit" : "Off")
-      });
-      currentUidState = (newState === "on" ? "ON" : "OFF");
-    }
+    await iloRequest("/rest/v1/Systems/1", "PATCH", {
+      IndicatorLED: newState
+    });
+    currentUidState = (newState === "Lit" ? "ON" : "OFF");
     updateUidUI(currentUidState);
     showMobileToast(`UID LED is now ${currentUidState}`);
   } catch (err) {
@@ -503,11 +471,11 @@ function updateUidUI(state) {
 /* ---------------- TELEMETRY ---------------- */
 async function loadTelemetry() {
   try {
-    const data = (activeConfig.mode === "gateway") 
-      ? await iloRequest("/api/system/summary") 
-      : { system: await iloRequest("/rest/v1/Systems/1"), manager: await iloRequest("/rest/v1/Managers/1") };
+    const [sys, mgr] = await Promise.all([
+      iloRequest("/rest/v1/Systems/1"),
+      iloRequest("/rest/v1/Managers/1")
+    ]);
 
-    const sys = data.system || {};
     document.getElementById("telModel").textContent = sys.model || sys.Model || "ProLiant ML350 Gen9";
     document.getElementById("telSerial").textContent = sys.serial_number || sys.SerialNumber || "CZ254307FB";
     document.getElementById("telBios").textContent = sys.bios_version || sys.BiosVersion || "P92 v2.92";
@@ -518,7 +486,6 @@ async function loadTelemetry() {
     const mem = sys.memory_summary || sys.MemorySummary || {};
     if (mem.TotalSystemMemoryGiB) document.getElementById("telMemory").textContent = `${mem.TotalSystemMemoryGiB} GiB DDR4 ECC`;
 
-    const mgr = data.manager || {};
     if (mgr.firmware_version || mgr.FirmwareVersion) {
       document.getElementById("telIloVer").textContent = mgr.firmware_version || mgr.FirmwareVersion;
     }
@@ -532,10 +499,7 @@ async function loadTelemetry() {
 async function loadPowerSupplies() {
   const list = document.getElementById("telPsuList");
   try {
-    const data = (activeConfig.mode === "gateway")
-      ? await iloRequest("/api/system/power")
-      : await iloRequest("/rest/v1/Chassis/1/Power");
-
+    const data = await iloRequest("/rest/v1/Chassis/1/Power");
     const psus = data.power_supplies || data.PowerSupplies || [];
     if (psus.length === 0) {
       list.innerHTML = `<div style="color: var(--text-muted); font-size: 0.8rem;">No PSUs detected.</div>`;
@@ -564,10 +528,7 @@ async function loadSensors() {
   const grid = document.getElementById("sensorsGrid");
   const fans = document.getElementById("fansContainer");
   try {
-    const data = (activeConfig.mode === "gateway")
-      ? await iloRequest("/api/system/thermal")
-      : await iloRequest("/rest/v1/Chassis/1/Thermal");
-
+    const data = await iloRequest("/rest/v1/Chassis/1/Thermal");
     const temps = data.temperatures || data.Temperatures || [];
     const fanList = data.fans || data.Fans || [];
 
@@ -609,17 +570,11 @@ async function loadLogs(type = "iml") {
   list.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 20px;">Loading ${type.toUpperCase()}...</div>`;
 
   try {
-    let entries = [];
-    if (activeConfig.mode === "gateway") {
-      const data = await iloRequest(`/api/logs/${type}`);
-      entries = data.entries || [];
-    } else {
-      const path = (type === "iml") 
-        ? "/rest/v1/Systems/1/LogServices/IML/Entries" 
-        : "/rest/v1/Managers/1/LogServices/IEL/Entries";
-      const data = await iloRequest(path);
-      entries = data.Items || [];
-    }
+    const path = (type === "iml") 
+      ? "/rest/v1/Systems/1/LogServices/IML/Entries" 
+      : "/rest/v1/Managers/1/LogServices/IEL/Entries";
+    const data = await iloRequest(path);
+    const entries = data.Items || [];
 
     if (entries.length === 0) {
       list.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 20px;">No events recorded.</div>`;
@@ -700,22 +655,14 @@ function stopAutoPoll() {
 
 async function pollPowerState() {
   try {
-    if (activeConfig.mode === "gateway") {
-      const data = await iloRequest("/api/power/status");
-      if (data.power_state) {
-        currentPowerState = data.power_state;
-        updatePowerUI(currentPowerState);
-      }
-      if (data.uid_status) {
-        currentUidState = data.uid_status;
-        updateUidUI(currentUidState);
-      }
-    } else {
-      const sys = await iloRequest("/rest/v1/Systems/1");
-      if (sys && sys.PowerState) {
-        currentPowerState = sys.PowerState;
-        updatePowerUI(currentPowerState);
-      }
+    const sys = await iloRequest("/rest/v1/Systems/1");
+    if (sys && sys.PowerState) {
+      currentPowerState = sys.PowerState;
+      updatePowerUI(currentPowerState);
+    }
+    if (sys && sys.IndicatorLED) {
+      currentUidState = sys.IndicatorLED;
+      updateUidUI(currentUidState);
     }
   } catch (e) {
     // Ignore minor periodic poll failures

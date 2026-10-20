@@ -38,20 +38,8 @@
         </div>
 
         <div style="margin-bottom: 12px;">
-          <label class="setting-label">Connection Mode</label>
-          <div class="mode-toggle-group">
-            <button type="button" class="mode-toggle-btn active" id="btnModeDirect" onclick="setLoginMode('direct')">
-              ⚡ Direct iLO (Wi-Fi)
-            </button>
-            <button type="button" class="mode-toggle-btn" id="btnModeGateway" onclick="setLoginMode('gateway')">
-              🌐 Gateway Mode
-            </button>
-          </div>
-        </div>
-
-        <div style="margin-bottom: 12px;">
           <label class="setting-label" id="lblHostInput">iLO 4 Server IP or Hostname</label>
-          <input type="text" class="mobile-input font-mono" id="loginHost" placeholder="e.g. 192.168.1.100 or ilo.local">
+          <input type="text" class="mobile-input font-mono" id="loginHost" placeholder="e.g. 192.168.8.53 or ilo.local">
         </div>
 
         <div style="margin-bottom: 12px;">
@@ -77,9 +65,15 @@
           <input type="text" class="mobile-input" id="loginProfileName" placeholder="e.g. Home Server ML350">
         </div>
 
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 18px; font-size: 0.8rem; color: var(--text-muted);">
-          <input type="checkbox" id="chkRememberProfile" checked style="cursor: pointer;">
-          <label for="chkRememberProfile" style="cursor: pointer;">Remember this server on device</label>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; font-size: 0.8rem; color: var(--text-muted);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="chkRememberProfile" checked style="cursor: pointer;">
+            <label for="chkRememberProfile" style="cursor: pointer;">Remember credentials on device</label>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="chkAutoConnect" checked style="cursor: pointer;">
+            <label for="chkAutoConnect" style="cursor: pointer;">Auto-connect on launch</label>
+          </div>
         </div>
 
         <button type="button" class="primary-btn" id="btnLoginConnect" onclick="attemptLogin()">
@@ -337,10 +331,6 @@
         <div class="section-title">Active Server Connection</div>
         <div class="card info-card">
           <div class="info-row">
-            <span class="info-label">Mode</span>
-            <span class="info-val font-bold" id="setCurrMode">Direct iLO</span>
-          </div>
-          <div class="info-row">
             <span class="info-label">Target Host</span>
             <span class="info-val font-mono" id="setCurrHost">--</span>
           </div>
@@ -360,8 +350,8 @@
         </div>
 
         <div class="card" style="margin-top: 14px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
-          <strong style="color: #60a5fa;">iLO 4 Remote (Open Source)</strong><br>
-          Supports direct local Wi-Fi and remote VPN/gateway access to HP iLO 4 servers.
+          <strong style="color: #60a5fa;">iLO 4 Remote</strong><br>
+          Direct client-side HTTPS connection to HP iLO 4 servers. Saved credentials persist securely across restarts in device storage.
         </div>
       </section>
 

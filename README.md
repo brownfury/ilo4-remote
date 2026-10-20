@@ -1,6 +1,6 @@
 # ilo4-remote
 
-A lightweight, native-feeling mobile app (Android APK and iOS IPA) and companion web dashboard for managing HP iLO 4 servers.
+A lightweight, native mobile app (Android APK and sideloadable iOS IPA) for managing HP iLO 4 servers directly over your local network or VPN.
 
 ---
 
@@ -12,19 +12,35 @@ The problem has always been remote management on mobile. The official "HP iLO Mo
 
 HP's web interface works fine on a desktop browser, but it's miserable to navigate on a phone when you just want to power on a box from the couch, check temperatures after a heavy job, or see why a fan suddenly ramped up.
 
-I wrote this project to solve that annoyance. It talks directly to the iLO 4 RESTful API (`/rest/v1`), requires no cloud accounts or third-party services, and runs cleanly on both Android and iOS.
+I wrote this project to solve that annoyance. It talks directly to the iLO 4 RESTful API (`/rest/v1`), requires no web servers, no background daemons, and no cloud accounts, and runs cleanly on both Android and iOS.
 
 ---
 
-### What it does
+### Live Demo (iPhone running iOS)
 
-- **Power control**: Check power status (with live polling), turn on, ACPI graceful shutdown, momentary button press, cold boot, and force off.
+Here is the app running live on iPhone connected to an HP ProLiant ML350 Gen9 over local Wi-Fi:
+
+| Power & Server Status | Sea of Sensors (46 Points) | Integrated Management Log |
+| :---: | :---: | :---: |
+| <img src="images/screenshot_power.jpg" width="260" alt="Power Dashboard" /> | <img src="images/screenshot_sensors.jpg" width="260" alt="Sea of Sensors" /> | <img src="images/screenshot_iml_log.jpg" width="260" alt="IML Log" /> |
+
+| iLO Event Log | REST API Explorer | Server Settings & Auto-Connect |
+| :---: | :---: | :---: |
+| <img src="images/screenshot_ilo_events.jpg" width="260" alt="iLO Event Log" /> | <img src="images/screenshot_rest_api.jpg" width="260" alt="REST API Explorer" /> | <img src="images/screenshot_settings.jpg" width="260" alt="Server Connection Settings" /> |
+
+---
+
+### Features
+
+- **Direct HTTPS Connection**: Connects straight to iLO 4 (`https://<ilo-ip>/rest/v1/`) without any proxy, gateway, or python service. Handles iLO's default self-signed SSL certificates safely at the native OS layer.
+- **Persistent Credentials & Auto-Connect**: Uses native OS storage (`NSUserDefaults` on iOS, `SharedPreferences` on Android via `@capacitor/preferences`) to remember your server details across phone restarts and updates. Toggle "Auto-connect on launch" to jump straight into your dashboard when you open the app.
+- **Power Control**: Check live power state, turn on, graceful ACPI shutdown, momentary button press, cold boot, and force off.
 - **UID LED**: Toggle the chassis blue beacon light.
-- **Thermal and fans**: Reads all 46 Sea of Sensors temperature points and displays duty cycles for all 8 cooling fans.
-- **Hardware telemetry**: Health rollup, dual CPU details, installed memory, and power supply status.
-- **Event logs**: View Integrated Management Log (IML) and iLO Event Log (IEL) entries with timestamps and severity.
-- **REST explorer**: A built-in requester to query any of the 120+ iLO 4 endpoints directly.
-- **Multi-server support**: Save multiple profiles (e.g., lab server, backup box) and switch between them.
+- **Thermal & Fans**: Reads all 46 Sea of Sensors temperature points (CPUs, DIMMs, system board, HD Max) and displays duty cycles for all cooling fans.
+- **Hardware Telemetry**: Health rollup, dual CPU details, installed memory, and power supply status.
+- **Event Logs**: View Integrated Management Log (IML) and iLO Event Log (IEL) entries with timestamps and severity tags.
+- **REST Explorer**: Built-in requester to query any of the 120+ iLO 4 endpoints directly and inspect JSON responses.
+- **Multi-Server Support**: Save multiple profiles (e.g., lab server, backup box) and switch between them seamlessly.
 
 ---
 
@@ -32,8 +48,8 @@ I wrote this project to solve that annoyance. It talks directly to the iLO 4 RES
 
 Pre-built binaries from the GitHub Actions build pipeline:
 
-- **Android (APK)**: [ilo4-remote-v1.0.3.apk](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.3/ilo4-remote-v1.0.3.apk) (~3.6 MB)
-- **iOS (Sideloadable IPA)**: [ilo4-remote-v1.0.3.ipa](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.3/ilo4-remote-v1.0.3.ipa) (~780 KB)
+- **Android (APK)**: [ilo4-remote-v1.0.4.apk](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.4/ilo4-remote-v1.0.4.apk) (~3.6 MB)
+- **iOS (Sideloadable IPA)**: [ilo4-remote-v1.0.4.ipa](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.4/ilo4-remote-v1.0.4.ipa) (~780 KB)
 
 Source releases and checksums are on the [Releases page](https://github.com/brownfury/ilo4-remote/releases).
 
@@ -53,40 +69,6 @@ Because iOS does not support loose sideloading out of the box without signing, u
 - **Sideloadly**: Connect via USB, drag the `.ipa` onto Sideloadly, provide your Apple ID for ad-hoc signing, and click Start.
 - **TrollStore**: Directly open and install if on a supported iOS version.
 - **Xcode**: Open `mobile/ios/App/App.xcworkspace`, select your connected device, pick your free personal team under Signing, and hit Run (`Cmd+R`).
-
----
-
-### How it connects
-
-The mobile app has two operating modes:
-
-1. **Direct Mode (Default)**:
-   Your phone sends authenticated HTTPS requests directly to `https://<ilo-ip>/rest/v1/` over your local Wi-Fi or VPN. It authenticates against `/rest/v1/SessionService/Sessions` to obtain a session token and executes all calls client-side. No intermediate computer or service is required.
-
-2. **Gateway Mode (Optional)**:
-   If you have a machine on your network running the Python companion service (`app.py`), the mobile app can route requests through it instead (`http://<gateway-ip>:8000`). This is useful if you want a browser dashboard accessible on your home network at the same time.
-
-Your credentials remain stored in your phone's local storage and are never transmitted anywhere other than your server.
-
----
-
-### Running the Web Gateway (Optional)
-
-If you also want the web dashboard:
-
-```bash
-# Clone the repository
-git clone https://github.com/brownfury/ilo4-remote.git
-cd ilo4-remote
-
-# Install Python requirements
-pip install -r requirements.txt
-
-# Start the server (binds to 0.0.0.0:8000)
-./run.sh
-```
-
-Then open `http://<your-machine-ip>:8000` from any browser on your network.
 
 ---
 
@@ -116,6 +98,12 @@ open App.xcworkspace
 ```
 
 Automated builds for both platforms are defined in `.github/workflows/build-and-release.yml`. Pushing a tag (`git tag vX.Y.Z && git push origin vX.Y.Z`) compiles both targets in GitHub Actions.
+
+---
+
+### Security & Privacy
+
+All credentials and server addresses are stored strictly on-device in native protected storage (`NSUserDefaults` / `SharedPreferences`). The app never contacts any cloud servers, telemetry endpoints, or third-party APIs. All network traffic is strictly between your phone and your server's iLO IP.
 
 ---
 

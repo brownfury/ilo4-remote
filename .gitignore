@@ -24,9 +24,10 @@ mobile/android/local.properties
 *.apk
 *.aab
 
-# Keep releases folder tracked for the built APK
+# Keep releases folder tracked for the built APK and IPA
 !releases/
 !releases/*.apk
+!releases/*.ipa
 
 # iOS
 *.mode1v3
