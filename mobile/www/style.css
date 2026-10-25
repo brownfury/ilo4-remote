@@ -174,6 +174,31 @@ body {
 .login-feedback.success { color: #34d399; }
 .login-feedback.loading { color: #60a5fa; }
 
+.login-feedback-banner {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  margin-bottom: 14px;
+  word-break: break-word;
+  transition: all 0.2s ease;
+}
+.login-feedback-banner.error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+.login-feedback-banner.success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+}
+.login-feedback-banner.loading {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+}
+
 .app-bar-content {
   display: flex;
   align-items: center;

@@ -336,17 +336,25 @@ async function httpRequest({ url, method = "GET", headers = {}, data = null }) {
       };
     } catch (e) {
       console.warn("CapacitorHttp request error:", e);
-      throw e;
+      throw new Error(`Native HTTP Error: ${e.message || 'Connection refused or certificate rejection'}`);
     }
   }
 
   // Standard fetch fallback (browser or dev mode)
-  const fetchOpts = {
-    method,
-    headers,
-    body: data ? (typeof data === "string" ? data : JSON.stringify(data)) : undefined
-  };
-  return await fetch(url, fetchOpts);
+  try {
+    const fetchOpts = {
+      method,
+      headers,
+      body: data ? (typeof data === "string" ? data : JSON.stringify(data)) : undefined
+    };
+    const res = await fetch(url, fetchOpts);
+    return res;
+  } catch (err) {
+    if (err.name === "TypeError" && (err.message || "").toLowerCase().includes("fetch")) {
+      throw new Error(`Self-signed certificate or network unreachable. If testing in desktop browser, open ${url} in a tab first and click 'Proceed', or run in the installed mobile app.`);
+    }
+    throw err;
+  }
 }
 
 /* ---------------- CONNECTION TESTING ---------------- */
@@ -365,21 +373,18 @@ async function testServerConnection(cfg) {
   if (type === "proxmox") {
     const base = `https://${host}:${port}${basePath}/api2/json`;
     try {
-      // Step 1: Reachability check on PVE version endpoint (does not require auth)
-      const verRes = await httpRequest({
-        url: `${base}/version`,
-        method: "GET",
-        headers
-      });
-
-      if (!verRes.ok && verRes.status !== 401) {
-        return { ok: false, error: `Host unreachable on port ${port} (HTTP ${verRes.status})` };
-      }
-
+      // Step 1: Reachability check on PVE version endpoint (or access ticket)
       let verData = null;
       try {
-        const body = await verRes.json();
-        verData = body?.data;
+        const verRes = await httpRequest({
+          url: `${base}/version`,
+          method: "GET",
+          headers
+        });
+        if (verRes.ok) {
+          const body = await verRes.json();
+          verData = body?.data;
+        }
       } catch (e) {}
 
       // Step 2: Auth check if credentials provided
@@ -391,21 +396,29 @@ async function testServerConnection(cfg) {
           headers: { ...headers, Authorization: tokenHeader }
         });
         if (!authRes.ok) {
-          return { ok: false, error: `API Token rejected (HTTP ${authRes.status})` };
+          let detail = "";
+          try { const j = await authRes.json(); detail = j?.message; } catch (e) {}
+          return { ok: false, error: `API Token rejected (HTTP ${authRes.status}): ${detail || 'Invalid token or insufficient privileges'}` };
         }
       } else if (cfg.password) {
+        let authUser = (cfg.user || "root").trim();
+        if (!authUser.includes("@")) {
+          authUser = `${authUser}@${cfg.realm || "pam"}`;
+        }
         const ticketRes = await httpRequest({
           url: `${base}/access/ticket`,
           method: "POST",
           headers: { ...headers, "Content-Type": "application/json" },
           data: {
-            username: `${cfg.user}@${cfg.realm || "pam"}`,
+            username: authUser,
             password: cfg.password,
             otp: cfg.otp || undefined
           }
         });
         if (!ticketRes.ok) {
-          return { ok: false, error: `Invalid PVE credentials (HTTP ${ticketRes.status})` };
+          let detail = "";
+          try { const j = await ticketRes.json(); detail = j?.message; } catch (e) {}
+          return { ok: false, error: `Authentication failed (HTTP ${ticketRes.status}): ${detail || 'Check username, realm (pam vs pve), and password'}` };
         }
       }
 
@@ -414,7 +427,7 @@ async function testServerConnection(cfg) {
       return { ok: true, latency: elapsed, info: `${release} (${elapsed}ms)` };
 
     } catch (err) {
-      return { ok: false, error: `Network connection failed: ${err.message}` };
+      return { ok: false, error: err.message };
     }
   } else {
     // iLO 4 testing
@@ -652,10 +665,30 @@ async function deleteProfileByIndex(i) {
 
 /* ---------------- LOGIN EXECUTION ---------------- */
 function showLoginFeedback(msg, type) {
-  const el = document.getElementById("loginStatusFeedback");
-  if (!el) return;
-  el.textContent = msg;
-  el.className = `login-feedback ${type}`;
+  const bottomEl = document.getElementById("loginStatusFeedback");
+  const topEl = document.getElementById("loginTopFeedback");
+
+  if (bottomEl) {
+    bottomEl.textContent = msg;
+    bottomEl.className = `login-feedback ${type}`;
+  }
+
+  if (topEl) {
+    if (msg) {
+      topEl.textContent = msg;
+      topEl.className = `login-feedback-banner ${type}`;
+      topEl.style.display = "block";
+      try {
+        topEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch (e) {}
+    } else {
+      topEl.style.display = "none";
+    }
+  }
+
+  if (type === "error") {
+    showMobileToast(msg);
+  }
 }
 
 function togglePasswordVisibility() {
@@ -932,6 +965,11 @@ async function loginProxmox() {
     return test;
   }
 
+  let authUser = (activeConfig.user || "root").trim();
+  if (!authUser.includes("@")) {
+    authUser = `${authUser}@${activeConfig.realm || "pam"}`;
+  }
+
   const res = await httpRequest({
     url: `${base}/access/ticket`,
     method: "POST",
@@ -940,14 +978,26 @@ async function loginProxmox() {
       "Content-Type": "application/json"
     },
     data: {
-      username: `${activeConfig.user}@${activeConfig.realm || "pam"}`,
+      username: authUser,
       password: activeConfig.password,
       otp: activeConfig.otp || undefined
     }
   });
 
   if (!res.ok) {
-    throw new Error(`Proxmox Authentication Failed (HTTP ${res.status}). Verify user, realm, password or 2FA.`);
+    let detail = "";
+    try {
+      const errJson = await res.json();
+      if (errJson?.message) detail = errJson.message.trim();
+    } catch (e) {}
+
+    if (res.status === 401) {
+      throw new Error(`Authentication Failed (HTTP 401): ${detail || 'Invalid username or password'}. Verify credentials and realm.`);
+    } else if (res.status === 0 || !res.status) {
+      throw new Error(`Connection Failed: Unable to reach https://${activeConfig.host}:${activeConfig.port}. Check if device is on the same Wi-Fi / VPN.`);
+    } else {
+      throw new Error(`Proxmox Authentication Failed (HTTP ${res.status}): ${detail || 'Verify URL and credentials'}`);
+    }
   }
 
   const json = await res.json();
