@@ -108,8 +108,13 @@ if (fs.existsSync(infoPlistPath)) {
     plist = plist.replace('<dict>', '<dict>\n' + atsBlock);
     fs.writeFileSync(infoPlistPath, plist, 'utf8');
     console.log('✓ Added NSAppTransportSecurity to Info.plist.');
-  } else {
-    console.log('✓ Info.plist already has NSAppTransportSecurity.');
+  }
+
+  if (!plist.includes('NSLocalNetworkUsageDescription')) {
+    const localNetBlock = `\t<key>NSLocalNetworkUsageDescription</key>\n\t<string>iLO 4 Remote requires local network access to find, connect to, and manage HP iLO 4 and Proxmox VE servers on your home or office LAN.</string>\n\t<key>NSBonjourServices</key>\n\t<array>\n\t\t<string>_http._tcp</string>\n\t\t<string>_https._tcp</string>\n\t</array>\n`;
+    plist = plist.replace('</dict>\n</plist>', localNetBlock + '</dict>\n</plist>');
+    fs.writeFileSync(infoPlistPath, plist, 'utf8');
+    console.log('✓ Added NSLocalNetworkUsageDescription to Info.plist.');
   }
 }
 
