@@ -57,6 +57,10 @@ const server = http.createServer((req, res) => {
       delete proxyHeaders['referer'];
       proxyHeaders['Host'] = parsedTarget.host;
 
+      if (proxyHeaders['authorization'] && proxyHeaders['authorization'].startsWith('PVEAuthCookie=')) {
+        proxyHeaders['Cookie'] = proxyHeaders['authorization'];
+      }
+
       const proxyOpts = {
         hostname: parsedTarget.hostname,
         port: parsedTarget.port || (isHttps ? 443 : 80),

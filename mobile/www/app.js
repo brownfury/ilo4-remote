@@ -356,7 +356,7 @@ async function httpRequest({ url, method = "GET", headers = {}, data = null }) {
     if (!isDevServer) {
       // Try local dev proxy fallback if available on localhost:3000
       try {
-        const devProxyUrl = `/__proxy?url=${encodeURIComponent(url)}`;
+        const devProxyUrl = `http://localhost:3000/__proxy?url=${encodeURIComponent(url)}`;
         const proxyRes = await fetch(devProxyUrl, fetchOpts);
         return proxyRes;
       } catch (e) {}
@@ -936,6 +936,7 @@ async function pveRequest(endpoint, method = "GET", body = null, isRetry = false
     if (!activeConfig.token) {
       await loginProxmox();
     }
+    headers["Authorization"] = `PVEAuthCookie=${activeConfig.token}`;
     headers["Cookie"] = `PVEAuthCookie=${activeConfig.token}`;
     if (method !== "GET" && activeConfig.csrfToken) {
       headers["CSRFPreventionToken"] = activeConfig.csrfToken;
