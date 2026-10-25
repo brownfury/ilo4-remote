@@ -762,8 +762,13 @@ async function attemptLogin(isAuto = false) {
       await Storage.set("server_auto_connect", autoConnect ? "true" : "false");
 
       // Save/update profile in profiles list
-      const pName = profileName || activeConfig.host;
-      const existingIdx = savedProfiles.findIndex(p => p.host === activeConfig.host && p.type === activeConfig.type);
+      const pName = profileName || `${activeConfig.host}:${activeConfig.port}`;
+      const existingIdx = savedProfiles.findIndex(p => {
+        if (profileName && p.name) {
+          return p.name.toLowerCase() === profileName.toLowerCase() && p.type === activeConfig.type;
+        }
+        return p.host === activeConfig.host && p.port === activeConfig.port && p.type === activeConfig.type && (p.user === activeConfig.user || p.tokenId === activeConfig.tokenId);
+      });
       const newP = {
         name: pName,
         type: activeConfig.type,
