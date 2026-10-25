@@ -341,17 +341,28 @@ async function httpRequest({ url, method = "GET", headers = {}, data = null }) {
   }
 
   // Standard fetch fallback (browser or dev mode)
+  const isDevServer = window.location && (window.location.port === "3000" || window.location.pathname.includes("/__proxy"));
+  const requestUrl = isDevServer ? `/__proxy?url=${encodeURIComponent(url)}` : url;
+  const fetchOpts = {
+    method,
+    headers,
+    body: data ? (typeof data === "string" ? data : JSON.stringify(data)) : undefined
+  };
+
   try {
-    const fetchOpts = {
-      method,
-      headers,
-      body: data ? (typeof data === "string" ? data : JSON.stringify(data)) : undefined
-    };
-    const res = await fetch(url, fetchOpts);
+    const res = await fetch(requestUrl, fetchOpts);
     return res;
   } catch (err) {
+    if (!isDevServer) {
+      // Try local dev proxy fallback if available on localhost:3000
+      try {
+        const devProxyUrl = `/__proxy?url=${encodeURIComponent(url)}`;
+        const proxyRes = await fetch(devProxyUrl, fetchOpts);
+        return proxyRes;
+      } catch (e) {}
+    }
     if (err.name === "TypeError" && (err.message || "").toLowerCase().includes("fetch")) {
-      throw new Error(`Self-signed certificate or network unreachable. If testing in desktop browser, open ${url} in a tab first and click 'Proceed', or run in the installed mobile app.`);
+      throw new Error(`Browser CORS / Self-signed SSL error: Browser blocked connection to ${url}. Run 'npm run dev' (dev-server.js) for desktop browser testing, or run on phone where native SSL bypass is active.`);
     }
     throw err;
   }

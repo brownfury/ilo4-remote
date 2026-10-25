@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "dev": "node scripts/dev-server.js",
     "postinstall": "node scripts/patch-ssl.js",
     "patch-ssl": "node scripts/patch-ssl.js",
     "test": "echo \"Error: no test specified\" && exit 1"
