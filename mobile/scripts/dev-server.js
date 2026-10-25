@@ -75,6 +75,7 @@ const server = http.createServer((req, res) => {
         resHeaders['Access-Control-Allow-Origin'] = '*';
         resHeaders['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS';
         resHeaders['Access-Control-Allow-Headers'] = '*';
+        resHeaders['Access-Control-Expose-Headers'] = '*';
 
         res.writeHead(proxyRes.statusCode, resHeaders);
         proxyRes.pipe(res);
