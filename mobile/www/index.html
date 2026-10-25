@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b0f19">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>iLO 4 Remote</title>
+  <title>iLO 4 & Proxmox Remote</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,13 +14,40 @@
   <!-- ==================== SCREEN 0: SECURE LOGIN & CONNECTION ==================== -->
   <div id="screen-login" class="login-overlay">
     <div class="login-container">
+      
+      <!-- Back to Active Server Navigation (Visible when returning from Settings or active session) -->
+      <div id="loginBackNav" class="login-back-bar" style="display: none;">
+        <button type="button" class="back-link-btn" id="btnBackToDashboard" onclick="returnToDashboard()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          <span>Back to Active Session</span>
+        </button>
+      </div>
+
       <div class="login-brand">
-        <div class="login-logo">HPE</div>
-        <h2>iLO 4 Remote</h2>
-        <p>Open-source management client for HP Integrated Lights-Out 4</p>
+        <div class="login-logo" id="loginLogoBadge">HPE</div>
+        <h2 id="loginTitleHeader">Server Remote</h2>
+        <p id="loginSubtitle">Open-source client for HP iLO 4 and Proxmox VE</p>
       </div>
 
       <div class="card login-card">
+        
+        <!-- Server Type Selector -->
+        <div style="margin-bottom: 14px;">
+          <label class="setting-label">Server Type</label>
+          <div class="server-type-toggle">
+            <button type="button" class="server-type-btn active" id="btnTypeIlo" onclick="selectServerType('ilo4')">
+              <span class="type-icon">⚡</span>
+              <span>HP iLO 4</span>
+            </button>
+            <button type="button" class="server-type-btn" id="btnTypePve" onclick="selectServerType('proxmox')">
+              <span class="type-icon">🟠</span>
+              <span>Proxmox VE</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Saved Profiles Selector (if any) -->
         <div id="profileSelectorRow" style="display: none; margin-bottom: 14px;">
           <label class="setting-label">Saved Server Profiles</label>
@@ -28,7 +55,7 @@
             <select class="mobile-select" id="loginProfileSelect" style="flex: 1;">
               <option value="">-- Select Saved Server --</option>
             </select>
-            <button class="icon-btn" id="btnDeleteProfile" title="Delete Profile" style="width: 42px; height: 42px; border-radius: 8px;">
+            <button type="button" class="icon-btn" id="btnDeleteProfile" title="Delete Profile" style="width: 42px; height: 42px; border-radius: 8px;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -37,32 +64,100 @@
           </div>
         </div>
 
-        <div style="margin-bottom: 12px;">
-          <label class="setting-label" id="lblHostInput">iLO 4 Server IP or Hostname</label>
-          <input type="text" class="mobile-input font-mono" id="loginHost" placeholder="e.g. 192.168.8.53 or ilo.local">
+        <!-- Target Host & Port -->
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+          <div style="flex: 3;">
+            <label class="setting-label" id="lblHostInput">Server IP or Hostname</label>
+            <input type="text" class="mobile-input font-mono" id="loginHost" placeholder="e.g. 192.168.1.100 or server.local">
+          </div>
+          <div style="flex: 1.2;">
+            <label class="setting-label">Port</label>
+            <input type="number" class="mobile-input font-mono" id="loginPort" placeholder="443">
+          </div>
         </div>
 
-        <div style="margin-bottom: 12px;">
-          <label class="setting-label">Username</label>
-          <input type="text" class="mobile-input" id="loginUser" placeholder="Administrator">
-        </div>
-
-        <div style="margin-bottom: 14px;">
-          <label class="setting-label">Password</label>
-          <div style="position: relative;">
-            <input type="password" class="mobile-input font-mono" id="loginPassword" placeholder="Enter password" style="padding-right: 42px;">
-            <button type="button" class="btn-eye-toggle" id="btnTogglePassword" onclick="togglePasswordVisibility()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="eyeIcon">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
+        <!-- Proxmox Auth Mode Switcher (Visible in PVE mode) -->
+        <div id="pveAuthRow" style="display: none; margin-bottom: 12px;">
+          <label class="setting-label">Authentication Method</label>
+          <div class="auth-mode-toggle">
+            <button type="button" class="auth-mode-btn active" id="btnAuthUserPass" onclick="setPveAuthMode('password')">
+              User & Password
+            </button>
+            <button type="button" class="auth-mode-btn" id="btnAuthApiToken" onclick="setPveAuthMode('token')">
+              API Token
             </button>
           </div>
         </div>
 
+        <!-- Username / Realm / Password Fields -->
+        <div id="rowStandardAuth">
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <div style="flex: 2;">
+              <label class="setting-label" id="lblUsername">Username</label>
+              <input type="text" class="mobile-input" id="loginUser" placeholder="Administrator">
+            </div>
+            <div style="flex: 1.4; display: none;" id="colPveRealm">
+              <label class="setting-label">Realm</label>
+              <select class="mobile-select" id="loginRealm" style="width: 100%;">
+                <option value="pam">Linux (pam)</option>
+                <option value="pve">Proxmox (pve)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 12px;">
+            <label class="setting-label">Password</label>
+            <div style="position: relative;">
+              <input type="password" class="mobile-input font-mono" id="loginPassword" placeholder="Enter password" style="padding-right: 42px;">
+              <button type="button" class="btn-eye-toggle" id="btnTogglePassword" onclick="togglePasswordVisibility()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="eyeIcon">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Proxmox TOTP / 2FA field -->
+          <div id="rowPveOtp" style="display: none; margin-bottom: 12px;">
+            <label class="setting-label">TOTP / 2FA Code (Optional)</label>
+            <input type="text" class="mobile-input font-mono" id="loginOtp" placeholder="6-digit authenticator code" maxlength="8">
+          </div>
+        </div>
+
+        <!-- Proxmox API Token Fields -->
+        <div id="rowApiTokenAuth" style="display: none;">
+          <div style="margin-bottom: 12px;">
+            <label class="setting-label">Token ID</label>
+            <input type="text" class="mobile-input font-mono" id="loginTokenId" placeholder="e.g. root@pam!mobile-app">
+          </div>
+          <div style="margin-bottom: 12px;">
+            <label class="setting-label">Token Secret (UUID)</label>
+            <input type="password" class="mobile-input font-mono" id="loginTokenSecret" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+          </div>
+        </div>
+
+        <!-- Connection Routing & Reverse Proxy settings (Collapsible) -->
+        <details class="routing-accordion" style="margin-bottom: 14px;">
+          <summary class="routing-summary">
+            <span>⚙ Connection Routing (VPN / Reverse Proxy / Headers)</span>
+          </summary>
+          <div style="padding-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+            <div>
+              <label class="setting-label">Path Prefix / Subpath</label>
+              <input type="text" class="mobile-input font-mono" id="loginBasePath" placeholder="/ (or /pve)">
+            </div>
+            <div>
+              <label class="setting-label">Custom HTTP Headers (Header: Value per line)</label>
+              <textarea class="mobile-textarea font-mono" id="loginCustomHeaders" rows="2" placeholder="CF-Access-Client-Id: xxx&#10;CF-Access-Client-Secret: yyy"></textarea>
+            </div>
+          </div>
+        </details>
+
+        <!-- Profile Name -->
         <div style="margin-bottom: 16px;">
           <label class="setting-label">Profile Name (Optional)</label>
-          <input type="text" class="mobile-input" id="loginProfileName" placeholder="e.g. Home Server ML350">
+          <input type="text" class="mobile-input" id="loginProfileName" placeholder="e.g. Home Server ML350 or PVE Lab">
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; font-size: 0.8rem; color: var(--text-muted);">
@@ -76,29 +171,37 @@
           </div>
         </div>
 
-        <button type="button" class="primary-btn" id="btnLoginConnect" onclick="attemptLogin()">
-          <span id="loginBtnText">Connect to Server</span>
-        </button>
+        <!-- Dual Action Buttons: Test Connection & Connect -->
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="secondary-btn" id="btnTestConnection" style="flex: 1;" onclick="testCurrentServerConnection()">
+            <span id="testBtnText">⚡ Test Connection</span>
+          </button>
+          <button type="button" class="primary-btn" id="btnLoginConnect" style="flex: 1.4;" onclick="attemptLogin()">
+            <span id="loginBtnText">Connect to Server</span>
+          </button>
+        </div>
 
+        <!-- Login / Test Feedback Box -->
         <div id="loginStatusFeedback" class="login-feedback"></div>
       </div>
 
       <div style="font-size: 0.72rem; color: var(--text-dim); text-align: center; margin-top: 20px; line-height: 1.4;">
         Direct client-side HTTPS connection.<br>
-        Credentials are stored only on your device and are never sent externally.
+        Credentials stored safely in persistent device storage.
       </div>
     </div>
   </div>
 
   <!-- ==================== MAIN APPLICATION DASHBOARD ==================== -->
   <div id="app-main" style="display: none; height: 100vh; flex-direction: column;">
+    
     <!-- Mobile Top App Bar -->
     <header class="app-bar">
       <div class="app-bar-content">
         <div class="app-brand">
-          <div class="app-logo">HPE</div>
+          <div class="app-logo" id="headerAppLogo">HPE</div>
           <div class="app-title-group">
-            <div class="app-title">iLO 4 Remote</div>
+            <div class="app-title" id="headerAppTitle">iLO 4 Remote</div>
             <div class="app-subtitle">
               <span class="status-indicator-dot" id="headerDot"></span>
               <span id="headerHostLabel">Connected</span>
@@ -108,6 +211,7 @@
           </div>
         </div>
         <div class="app-bar-actions">
+          <!-- UID button (visible on iLO 4) -->
           <button class="icon-btn" id="btnHeaderUid" title="UID Beacon LED">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="5"></circle>
@@ -117,12 +221,21 @@
               <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
             </svg>
           </button>
+          <!-- Shell / Terminal button (visible on Proxmox) -->
+          <button class="icon-btn" id="btnHeaderShell" title="Host Shell Terminal" style="display: none;" onclick="openNodeShellConsole()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="4 17 10 11 4 5"></polyline>
+              <line x1="12" y1="19" x2="20" y2="19"></line>
+            </svg>
+          </button>
+          <!-- Refresh button -->
           <button class="icon-btn" id="btnHeaderRefresh" title="Refresh">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/>
             </svg>
           </button>
-          <button class="icon-btn" id="btnHeaderDisconnect" title="Disconnect / Switch Server" onclick="showLoginScreen()">
+          <!-- Disconnect / Switch Server button -->
+          <button class="icon-btn" id="btnHeaderDisconnect" title="Switch / Manage Servers" onclick="showLoginScreen()">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
               <polyline points="16 17 21 12 16 7"></polyline>
@@ -136,7 +249,9 @@
     <!-- Main Scrollable Screen Container -->
     <main class="screens-container">
 
-      <!-- SCREEN 1: POWER CONTROLS -->
+      <!-- ==================== ILO 4 SCREENS ==================== -->
+
+      <!-- SCREEN: POWER CONTROLS -->
       <section id="screen-power" class="screen-view active">
         <!-- Big Circular Power Dial -->
         <div class="card power-hero-card">
@@ -221,10 +336,10 @@
         </div>
       </section>
 
-      <!-- SCREEN 2: HARDWARE TELEMETRY -->
+      <!-- SCREEN: TELEMETRY & HARDWARE HEALTH (ILO) -->
       <section id="screen-telemetry" class="screen-view">
         <div class="section-title">Hardware Telemetry</div>
-        
+
         <div class="card info-card">
           <div class="info-row">
             <span class="info-label">Server Model</span>
@@ -235,89 +350,101 @@
             <span class="info-val font-mono" id="telSerial">--</span>
           </div>
           <div class="info-row">
-            <span class="info-label">BIOS / ROM</span>
-            <span class="info-val font-mono" id="telBios">--</span>
+            <span class="info-label">iLO Firmware</span>
+            <span class="info-val font-mono" id="telFirmware">--</span>
           </div>
           <div class="info-row">
             <span class="info-label">Overall Health</span>
-            <span class="pill pill-ok" id="telHealth">--</span>
+            <span class="info-val" id="telOverallHealth">--</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Power Consumption</span>
+            <span class="info-val" id="telPowerSummary">--</span>
           </div>
         </div>
 
+        <div class="section-title" style="margin-top: 18px;">Subsystem Status</div>
         <div class="card info-card">
           <div class="info-row">
-            <span class="info-label">Processors</span>
-            <span class="info-val" id="telCpu">--</span>
+            <span class="info-label">Processor(s)</span>
+            <span class="info-val" id="telCpuModel">--</span>
           </div>
           <div class="info-row">
-            <span class="info-label">Total Memory</span>
-            <span class="info-val font-bold" id="telMemory">--</span>
+            <span class="info-label">CPU Cores</span>
+            <span class="info-val" id="telCpuCount">--</span>
           </div>
           <div class="info-row">
-            <span class="info-label">iLO 4 Firmware</span>
-            <span class="info-val font-mono" id="telIloVer">--</span>
+            <span class="info-label">Installed Memory</span>
+            <span class="info-val" id="telMemorySize">--</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Power Supplies</span>
+            <span class="info-val" id="telPsuSummary">--</span>
           </div>
         </div>
-
-        <div class="section-title">Power Supplies</div>
-        <div id="telPsuList" class="psu-list"></div>
       </section>
 
-      <!-- SCREEN 3: SENSORS & FANS -->
+      <!-- SCREEN: SEA OF SENSORS (ILO) -->
       <section id="screen-sensors" class="screen-view">
-        <div class="section-title">Sea of Sensors™ Readings</div>
-        <div class="sensors-scroll-grid" id="sensorsGrid">
-          <div style="color: var(--text-muted); padding: 14px;">Loading thermal sensors...</div>
+        <div class="section-title">Thermal Zones & Sensors</div>
+        <div id="sensorsList" class="sensors-scroll-grid">
+          <div class="card" style="text-align: center; color: var(--text-dim); padding: 24px;">
+            Loading sensors data...
+          </div>
         </div>
 
-        <div class="section-title" style="margin-top: 24px;">Cooling Fans</div>
-        <div class="fans-horizontal-scroll" id="fansContainer"></div>
+        <div class="section-title" style="margin-top: 20px;">Cooling Fans</div>
+        <div id="fansList" class="fans-horizontal-scroll">
+          <div class="card" style="text-align: center; color: var(--text-dim); padding: 24px; grid-column: span 2;">
+            Loading fans data...
+          </div>
+        </div>
       </section>
 
-      <!-- SCREEN 4: EVENT LOGS -->
+      <!-- SCREEN: LOGS (ILO) -->
       <section id="screen-logs" class="screen-view">
-        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
-          <button class="filter-chip active" id="btnFilterIML" onclick="switchLogsType('iml')">IML Log</button>
-          <button class="filter-chip" id="btnFilterIEL" onclick="switchLogsType('iel')">iLO Events</button>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+          <button class="filter-chip active" id="btnFilterIML" onclick="switchLogType('iml')">Integrated Mgmt Log (IML)</button>
+          <button class="filter-chip" id="btnFilterIEL" onclick="switchLogType('iel')">iLO Event Log (IEL)</button>
         </div>
 
-        <div class="logs-mobile-list" id="logsList">
-          <div style="color: var(--text-muted); padding: 20px; text-align: center;">Loading logs...</div>
+        <div id="logsList">
+          <div class="card" style="text-align: center; color: var(--text-dim); padding: 24px;">
+            Loading log entries...
+          </div>
         </div>
       </section>
 
-      <!-- SCREEN 5: REST API EXPLORER -->
+      <!-- SCREEN: REST API EXPLORER (ILO) -->
       <section id="screen-api" class="screen-view">
-        <div class="section-title">REST API Explorer</div>
-        
-        <div class="card" style="margin-bottom: 14px;">
-          <input type="text" class="mobile-input" id="apiSearch" placeholder="Search endpoints (e.g. Systems, Thermal)..." style="margin-bottom: 10px;">
-          
+        <div class="section-title">RESTful API Requester</div>
+
+        <div class="card">
           <div class="url-composer-row">
             <select class="mobile-select" id="apiMethod">
               <option value="GET">GET</option>
               <option value="POST">POST</option>
               <option value="PATCH">PATCH</option>
-              <option value="DELETE">DELETE</option>
             </select>
-            <input type="text" class="mobile-input font-mono" id="apiPath" value="/rest/v1/Systems/1" style="flex: 1;">
+            <input type="text" class="mobile-input font-mono" id="apiPath" value="/rest/v1/Systems/1" placeholder="/rest/v1/...">
           </div>
 
-          <div style="display: flex; gap: 6px; overflow-x: auto; padding: 6px 0; margin-bottom: 10px;">
-            <button class="mini-tag" onclick="setApiPreset('/rest/v1/Systems/1')">Systems/1</button>
-            <button class="mini-tag" onclick="setApiPreset('/rest/v1/Chassis/1/Thermal')">Thermal</button>
-            <button class="mini-tag" onclick="setApiPreset('/rest/v1/Chassis/1/Power')">Power</button>
-            <button class="mini-tag" onclick="setApiPreset('/rest/v1/Managers/1')">Manager</button>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;">
+            <span class="mini-tag" onclick="setApiPreset('/rest/v1/Systems/1')">Systems</span>
+            <span class="mini-tag" onclick="setApiPreset('/rest/v1/Chassis/1')">Chassis</span>
+            <span class="mini-tag" onclick="setApiPreset('/rest/v1/Chassis/1/Thermal')">Thermal</span>
+            <span class="mini-tag" onclick="setApiPreset('/rest/v1/Chassis/1/Power')">Power</span>
+            <span class="mini-tag" onclick="setApiPreset('/rest/v1/Managers/1')">Managers</span>
           </div>
 
-          <textarea class="mobile-textarea font-mono" id="apiPayload" placeholder='JSON payload for POST/PATCH'></textarea>
-          
-          <button class="primary-btn" id="btnSendApi" style="margin-top: 10px;">
+          <textarea class="mobile-input font-mono" id="apiPayload" rows="3" placeholder='{"ResetType": "On"}' style="display: none; margin-bottom: 12px;"></textarea>
+
+          <button class="primary-btn" id="btnSendApi">
             Execute Request
           </button>
         </div>
 
-        <div class="card">
+        <div class="card" style="margin-top: 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">RESPONSE:</span>
             <span id="apiStatusBadge"></span>
@@ -326,17 +453,168 @@
         </div>
       </section>
 
-      <!-- SCREEN 6: SETTINGS & PROFILES -->
+
+      <!-- ==================== PROXMOX VE SCREENS ==================== -->
+
+      <!-- PVE SCREEN 1: CLUSTER & NODE OVERVIEW -->
+      <section id="screen-pve-cluster" class="screen-view">
+        <!-- Cluster Health Card -->
+        <div class="card pve-cluster-hero">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div>
+              <div class="cluster-badge-tag" id="pveClusterTypeTag">Proxmox VE Cluster</div>
+              <h2 id="pveClusterName" style="font-size: 1.3rem; font-weight: 800; color: #fff;">Cluster</h2>
+            </div>
+            <div id="pveQuorumBadge" class="pill pill-ok">QUORATE</div>
+          </div>
+
+          <!-- Aggregated Fleet Resource Bars -->
+          <div class="pve-metric-row">
+            <div class="pve-metric-box">
+              <span class="pve-metric-lbl">CPU USAGE</span>
+              <span class="pve-metric-val" id="pveTotalCpuVal">0%</span>
+              <div class="progress-bar-bg"><div class="progress-bar-fill cyan" id="pveTotalCpuBar" style="width: 0%;"></div></div>
+            </div>
+            <div class="pve-metric-box">
+              <span class="pve-metric-lbl">RAM ALLOCATION</span>
+              <span class="pve-metric-val" id="pveTotalRamVal">0 / 0 GB</span>
+              <div class="progress-bar-bg"><div class="progress-bar-fill purple" id="pveTotalRamBar" style="width: 0%;"></div></div>
+            </div>
+            <div class="pve-metric-box">
+              <span class="pve-metric-lbl">STORAGE CAPACITY</span>
+              <span class="pve-metric-val" id="pveTotalDiskVal">0 / 0 GB</span>
+              <div class="progress-bar-bg"><div class="progress-bar-fill green" id="pveTotalDiskBar" style="width: 0%;"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fleet Bulk Controls -->
+        <div class="section-title">Fleet & Bulk Operations</div>
+        <div class="bulk-actions-row">
+          <button class="bulk-btn green" onclick="confirmBulkGuestsAction('start')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>Start All Guests</span>
+          </button>
+          <button class="bulk-btn amber" onclick="confirmBulkGuestsAction('stop')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><rect x="9" y="9" width="6" height="6"></rect></svg>
+            <span>Stop All Guests</span>
+          </button>
+        </div>
+
+        <!-- Host Nodes List -->
+        <div class="section-title" style="margin-top: 18px;">Host Nodes</div>
+        <div id="pveNodesList" class="pve-cards-stack">
+          <div class="card" style="text-align: center; color: var(--text-dim); padding: 24px;">Loading nodes...</div>
+        </div>
+      </section>
+
+      <!-- PVE SCREEN 2: GUEST LIST & MANAGEMENT (VMS & LXC) -->
+      <section id="screen-pve-guests" class="screen-view">
+        <!-- Search & Filter Controls -->
+        <div class="guests-filter-bar">
+          <div class="search-input-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="pveGuestSearch" placeholder="Search VM ID, name, or tag..." oninput="filterPveGuests()">
+          </div>
+          <div class="chips-scroll-row">
+            <button class="filter-chip active" id="chipGuestAll" onclick="setGuestFilter('all')">All</button>
+            <button class="filter-chip" id="chipGuestVm" onclick="setGuestFilter('qemu')">VMs (QEMU)</button>
+            <button class="filter-chip" id="chipGuestLxc" onclick="setGuestFilter('lxc')">LXC Containers</button>
+            <button class="filter-chip" id="chipGuestRunning" onclick="setGuestFilter('running')">Running</button>
+            <button class="filter-chip" id="chipGuestStopped" onclick="setGuestFilter('stopped')">Stopped</button>
+          </div>
+        </div>
+
+        <!-- Guests Cards Stack -->
+        <div id="pveGuestsList" class="pve-cards-stack" style="margin-top: 12px;">
+          <div class="card" style="text-align: center; color: var(--text-dim); padding: 24px;">Loading guests...</div>
+        </div>
+      </section>
+
+      <!-- PVE SCREEN 3: STORAGE POOLS & BACKUPS -->
+      <section id="screen-pve-storage" class="screen-view">
+        <!-- Storage Pools Overview -->
+        <div class="section-title">Storage Pools (ZFS / LVM / Dir / NFS)</div>
+        <div id="pveStorageList" class="pve-cards-stack">
+          <div class="card" style="text-align: center; color: var(--text-dim); padding: 24px;">Loading storages...</div>
+        </div>
+
+        <!-- Backups & Manifests Section -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 8px;">
+          <div class="section-title" style="margin: 0;">Backup Manifests (vzdump)</div>
+          <button class="primary-btn" style="padding: 6px 12px; font-size: 0.75rem; width: auto;" onclick="openBackupTriggerModal()">
+            + New Backup Job
+          </button>
+        </div>
+        <div id="pveBackupsList" class="pve-cards-stack">
+          <div class="card" style="text-align: center; color: var(--text-dim); padding: 24px;">Loading backup manifests...</div>
+        </div>
+      </section>
+
+      <!-- PVE SCREEN 4: TASK HISTORY & HOST SYSLOG -->
+      <section id="screen-pve-tasks" class="screen-view">
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+          <button class="filter-chip active" id="btnFilterPveTasks" onclick="switchPveLogTab('tasks')">Cluster Tasks</button>
+          <button class="filter-chip" id="btnFilterPveSyslog" onclick="switchPveLogTab('syslog')">Host Syslog & Journal</button>
+        </div>
+
+        <!-- Task History View -->
+        <div id="pveTasksContainer">
+          <div id="pveTasksList" class="pve-cards-stack">
+            <div class="card" style="text-align: center; color: var(--text-dim); padding: 24px;">Loading tasks...</div>
+          </div>
+        </div>
+
+        <!-- Syslog View -->
+        <div id="pveSyslogContainer" style="display: none;">
+          <div class="card" style="margin-bottom: 10px;">
+            <div style="display: flex; gap: 8px;">
+              <select class="mobile-select" id="pveSyslogNodeSelect" onchange="loadPveSyslog()" style="flex: 1;"></select>
+              <input type="text" class="mobile-input font-mono" id="pveSyslogFilter" placeholder="Filter syslog..." oninput="filterSyslogLines()" style="flex: 1.5;">
+            </div>
+          </div>
+          <pre class="mobile-terminal-viewer" id="pveSyslogViewer">Loading host syslog & journal...</pre>
+        </div>
+      </section>
+
+      <!-- PVE SCREEN 5: HARDWARE TELEMETRY & DIAGNOSTICS -->
+      <section id="screen-pve-telemetry" class="screen-view">
+        <!-- CPU Package Temperatures -->
+        <div class="section-title">CPU Package Temperatures</div>
+        <div class="card info-card" id="pveCpuTempCard">
+          <div id="pveCpuTempReadouts">
+            <div style="text-align: center; color: var(--text-dim); padding: 12px;">Reading CPU core temperatures...</div>
+          </div>
+        </div>
+
+        <!-- Storage Disk Health & S.M.A.R.T. -->
+        <div class="section-title" style="margin-top: 20px;">Storage Disks & S.M.A.R.T. Health</div>
+        <div id="pveDisksList" class="pve-cards-stack">
+          <div class="card" style="text-align: center; color: var(--text-dim); padding: 24px;">Loading physical drives & SMART data...</div>
+        </div>
+      </section>
+
+      <!-- ==================== SHARED SCREEN: SETTINGS ==================== -->
       <section id="screen-settings" class="screen-view">
+        
+        <!-- Active Server Connection -->
         <div class="section-title">Active Server Connection</div>
         <div class="card info-card">
+          <div class="info-row">
+            <span class="info-label">Server Type</span>
+            <span class="info-val" id="setActiveType">--</span>
+          </div>
           <div class="info-row">
             <span class="info-label">Target Host</span>
             <span class="info-val font-mono" id="setCurrHost">--</span>
           </div>
           <div class="info-row">
-            <span class="info-label">Active User</span>
+            <span class="info-label">Active User / Token</span>
             <span class="info-val" id="setCurrUser">--</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Connection Latency</span>
+            <span class="info-val font-mono" id="setActiveLatency">--</span>
           </div>
 
           <div style="margin-top: 16px; display: flex; gap: 10px;">
@@ -349,16 +627,44 @@
           </div>
         </div>
 
-        <div class="card" style="margin-top: 14px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
-          <strong style="color: #60a5fa;">iLO 4 Remote</strong><br>
-          Direct client-side HTTPS connection to HP iLO 4 servers. Saved credentials persist securely across restarts in device storage.
+        <!-- Saved Server Profiles Manager -->
+        <div class="section-title" style="margin-top: 20px;">Saved Server Profiles</div>
+        <div id="settingsProfilesList" class="pve-cards-stack">
+          <div class="card" style="color: var(--text-dim); text-align: center; padding: 16px;">
+            No saved profiles yet.
+          </div>
+        </div>
+
+        <button class="primary-btn" style="margin-top: 12px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);" onclick="addNewServerProfile()">
+          + Add New Server Profile
+        </button>
+
+        <!-- App Security & Biometric Lock -->
+        <div class="section-title" style="margin-top: 24px;">Security & App Protection</div>
+        <div class="card info-card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 600; font-size: 0.9rem;">Biometric App Lock</div>
+              <div style="font-size: 0.75rem; color: var(--text-dim);">Require Face ID / Fingerprint / Passcode on launch</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="chkBiometricLock" onchange="toggleBiometricLock(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- About Information -->
+        <div class="card" style="margin-top: 16px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5;">
+          <strong style="color: #60a5fa;">iLO 4 & Proxmox Remote v2.0</strong><br>
+          Direct client-side HTTPS connection to HP iLO 4 and Proxmox VE servers. Zero intermediary servers. Saved profiles stay protected on your device.
         </div>
       </section>
 
     </main>
 
-    <!-- Mobile Bottom Tab Navigation -->
-    <nav class="bottom-nav">
+    <!-- Mobile Bottom Tab Navigation: iLO 4 Mode -->
+    <nav class="bottom-nav" id="nav-ilo">
       <button class="nav-item active" data-screen="screen-power">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
@@ -409,6 +715,217 @@
         <span>Settings</span>
       </button>
     </nav>
+
+    <!-- Mobile Bottom Tab Navigation: Proxmox VE Mode -->
+    <nav class="bottom-nav" id="nav-pve" style="display: none;">
+      <button class="nav-item active" data-screen="screen-pve-cluster">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+          <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+          <line x1="6" y1="6" x2="6.01" y2="6"></line>
+          <line x1="6" y1="18" x2="6.01" y2="18"></line>
+        </svg>
+        <span>Cluster</span>
+      </button>
+
+      <button class="nav-item" data-screen="screen-pve-guests">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="3" y1="9" x2="21" y2="9"></line>
+          <line x1="9" y1="21" x2="9" y2="9"></line>
+        </svg>
+        <span>Guests</span>
+      </button>
+
+      <button class="nav-item" data-screen="screen-pve-storage">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+        </svg>
+        <span>Storage</span>
+      </button>
+
+      <button class="nav-item" data-screen="screen-pve-tasks">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        <span>Tasks</span>
+      </button>
+
+      <button class="nav-item" data-screen="screen-pve-telemetry">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+        </svg>
+        <span>Telemetry</span>
+      </button>
+
+      <button class="nav-item" data-screen="screen-settings">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ==================== INTERACTIVE MODALS ==================== -->
+
+  <!-- INTERACTIVE CONSOLE MODAL (noVNC & xterm.js) -->
+  <div id="modal-console" class="modal-overlay" style="display: none;">
+    <div class="modal-card console-modal-card">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="status-indicator-dot" id="consoleStatusDot"></span>
+          <span id="consoleModalTitle" style="font-weight: 700; font-size: 0.95rem;">Interactive Console</span>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button class="icon-btn" onclick="toggleConsoleFullscreen()" title="Fullscreen">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+          </button>
+          <button class="icon-btn" onclick="closeConsoleModal()" title="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Console Frame / Screen Container -->
+      <div class="console-viewport-container" id="consoleViewport">
+        <iframe id="consoleIframe" class="console-iframe" src="about:blank" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+        <div id="consoleFallbackMsg" class="console-fallback-overlay" style="display: none;">
+          <div style="font-weight: 600; margin-bottom: 6px;">Opening Interactive Console Session</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Direct connection via Proxmox console engine</div>
+          <button class="primary-btn" id="btnLaunchExternalConsole" style="width: auto; padding: 8px 18px;">
+            Open Live Console
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile Touch Terminal Toolbar -->
+      <div class="console-touch-toolbar">
+        <button class="k-btn" onclick="sendConsoleKey('Escape')">ESC</button>
+        <button class="k-btn" onclick="sendConsoleKey('Tab')">TAB</button>
+        <button class="k-btn" onclick="sendConsoleKey('Ctrl+C')">CTRL+C</button>
+        <button class="k-btn" onclick="sendConsoleKey('Ctrl+Alt+Del')">CAD</button>
+        <button class="k-btn" onclick="sendConsoleKey('ArrowUp')">↑</button>
+        <button class="k-btn" onclick="sendConsoleKey('ArrowDown')">↓</button>
+        <button class="k-btn" onclick="sendConsoleKey('ArrowLeft')">←</button>
+        <button class="k-btn" onclick="sendConsoleKey('ArrowRight')">→</button>
+        <button class="k-btn" onclick="pasteToConsole()">📋 PASTE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GUEST MANAGEMENT & ACTIONS SHEET -->
+  <div id="modal-guest-manage" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <span class="badge" id="manageGuestTypeBadge">VM</span>
+          <span id="manageGuestTitle" style="font-weight: 700; font-size: 1rem; margin-left: 6px;">Guest 100</span>
+        </div>
+        <button class="icon-btn" onclick="closeGuestManageModal()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div style="padding: 16px;">
+        <!-- Power Controls -->
+        <label class="setting-label">Power Control</label>
+        <div class="manage-power-grid">
+          <button class="m-power-btn green" onclick="executeGuestPower('start')">▶ Start</button>
+          <button class="m-power-btn amber" onclick="executeGuestPower('shutdown')">⏹ Shutdown</button>
+          <button class="m-power-btn red" onclick="executeGuestPower('stop')">⚡ Force Stop</button>
+          <button class="m-power-btn purple" onclick="executeGuestPower('reboot')">⟳ Reboot</button>
+          <button class="m-power-btn blue" onclick="executeGuestPower('suspend')">⏸ Pause</button>
+          <button class="m-power-btn cyan" onclick="openCurrentGuestConsole()">📺 Console</button>
+        </div>
+
+        <!-- Edit Notes & Tags -->
+        <label class="setting-label" style="margin-top: 18px;">Guest Notes / Description</label>
+        <textarea class="mobile-textarea" id="manageGuestNotes" rows="2" placeholder="Add custom notes..."></textarea>
+
+        <label class="setting-label" style="margin-top: 12px;">Tags (comma or space separated)</label>
+        <input type="text" class="mobile-input" id="manageGuestTags" placeholder="e.g. production, db, docker">
+
+        <button class="primary-btn" style="margin-top: 10px; background: rgba(59, 130, 246, 0.2); color: #60a5fa;" onclick="saveGuestNotesAndTags()">
+          Save Notes & Tags
+        </button>
+
+        <!-- Container Root Disk Resizing (LXC / VM) -->
+        <div class="card" style="margin-top: 18px; border: 1px solid rgba(16, 185, 129, 0.3);">
+          <div style="font-weight: 700; font-size: 0.85rem; color: #34d399; margin-bottom: 8px;">Resize Disk Storage</div>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" class="mobile-input font-mono" id="manageDiskName" value="rootfs" placeholder="disk (e.g. rootfs or scsi0)" style="flex: 1.2;">
+            <input type="text" class="mobile-input font-mono" id="manageDiskSize" placeholder="+5G" style="flex: 1;">
+            <button class="primary-btn" style="width: auto; padding: 0 16px;" onclick="executeDiskResize()">
+              Resize
+            </button>
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 6px;">Format: +size (e.g. +2G, +10G) to extend root disk</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANUAL BACKUP JOB MODAL -->
+  <div id="modal-backup-job" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span style="font-weight: 700; font-size: 1rem;">Trigger Manual Backup (vzdump)</span>
+        <button class="icon-btn" onclick="closeBackupModal()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label class="setting-label">Target Guest</label>
+          <select class="mobile-select" id="backupSelectGuest" style="width: 100%;"></select>
+        </div>
+        <div>
+          <label class="setting-label">Target Storage</label>
+          <select class="mobile-select" id="backupSelectStorage" style="width: 100%;"></select>
+        </div>
+        <div>
+          <label class="setting-label">Backup Mode</label>
+          <select class="mobile-select" id="backupSelectMode" style="width: 100%;">
+            <option value="snapshot">Snapshot (Live, zero downtime)</option>
+            <option value="suspend">Suspend</option>
+            <option value="stop">Stop</option>
+          </select>
+        </div>
+        <div>
+          <label class="setting-label">Compression</label>
+          <select class="mobile-select" id="backupSelectCompress" style="width: 100%;">
+            <option value="zstd">ZSTD (Fast & High Ratio)</option>
+            <option value="gzip">GZIP</option>
+            <option value="0">Uncompressed</option>
+          </select>
+        </div>
+        <button class="primary-btn" style="margin-top: 8px;" onclick="startManualBackupJob()">
+          Start Backup Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASK LOG INSPECTOR MODAL -->
+  <div id="modal-task-log" class="modal-overlay" style="display: none;">
+    <div class="modal-card console-modal-card">
+      <div class="modal-header">
+        <span id="taskLogModalTitle" style="font-weight: 700; font-size: 0.95rem;">Task Summary Log</span>
+        <button class="icon-btn" onclick="closeTaskLogModal()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div style="flex: 1; padding: 12px; display: flex; flex-direction: column; overflow: hidden;">
+        <pre class="mobile-terminal-viewer" id="taskLogViewer" style="flex: 1; margin: 0;">Loading task log...</pre>
+      </div>
+    </div>
   </div>
 
   <!-- Mobile Toast Message -->
