@@ -48,8 +48,8 @@ Here is the app running live on iPhone connected to an HP ProLiant ML350 Gen9 ov
 
 Pre-built binaries from the GitHub Actions build pipeline:
 
-- **Android (APK)**: [ilo4-remote-v1.0.4.apk](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.4/ilo4-remote-v1.0.4.apk) (~3.6 MB)
-- **iOS (Sideloadable IPA)**: [ilo4-remote-v1.0.4.ipa](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.4/ilo4-remote-v1.0.4.ipa) (~780 KB)
+- **Android (APK)**: [ilo4-remote-v1.0.5.apk](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.5/ilo4-remote-v1.0.5.apk) (~3.6 MB)
+- **iOS (Sideloadable IPA)**: [ilo4-remote-v1.0.5.ipa](https://github.com/brownfury/ilo4-remote/releases/download/v1.0.5/ilo4-remote-v1.0.5.ipa) (~800 KB)
 
 Source releases and checksums are on the [Releases page](https://github.com/brownfury/ilo4-remote/releases).
 
